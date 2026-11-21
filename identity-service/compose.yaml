@@ -1,0 +1,62 @@
+name: exchange-identity
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: exchange-identity:local
+    container_name: identity-service
+    restart: unless-stopped
+    environment:
+      APP_NAME: identity
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_KEY: ${APP_KEY:-}
+      APP_URL: ${APP_URL:-http://localhost:8001}
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: identity_db
+      DB_USERNAME: identity_app
+      DB_PASSWORD: ${DB_PASSWORD:-local_identity_dev}
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: database
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - exchange-network
+      - database-network
+
+  db:
+    image: postgres:17-alpine
+    container_name: identity-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: identity_db
+      POSTGRES_USER: identity_app
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-local_identity_dev}
+    volumes:
+      - identity_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U identity_app -d identity_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - database-network
+
+volumes:
+  identity_postgres_data:
+
+networks:
+  exchange-network:
+    external: true
+    name: exchange-network
+  database-network:
+    internal: true
