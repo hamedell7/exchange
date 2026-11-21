@@ -12,7 +12,6 @@ services:
       APP_NAME: wallet
       APP_ENV: ${APP_ENV:-local}
       APP_DEBUG: ${APP_DEBUG:-true}
-      APP_KEY: ${APP_KEY:-}
       APP_URL: ${APP_URL:-http://localhost:8003}
       LOG_CHANNEL: stderr
       DB_CONNECTION: pgsql
@@ -24,6 +23,14 @@ services:
       CACHE_STORE: database
       SESSION_DRIVER: database
       QUEUE_CONNECTION: database
+    # Development: live source on the host, Linux dependencies in a Docker volume.
+    volumes:
+      - type: bind
+        source: .
+        target: /var/www/html
+      - type: volume
+        source: wallet_vendor
+        target: /var/www/html/vendor
     ports:
       - "127.0.0.1:8003:8000"
     depends_on:
@@ -53,6 +60,7 @@ services:
 
 volumes:
   wallet_postgres_data:
+  wallet_vendor:
 
 networks:
   exchange-network:
