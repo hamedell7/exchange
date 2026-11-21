@@ -36,11 +36,10 @@ final class UserRegistrationTest extends TestCase
         new UserId('  ');
     }
 
-    public function test_password_hash_rejects_blank_values(): void
+    public function test_password_hash_rejects_plain_text_and_accepts_encoded_hashes(): void
     {
         $this->expectException(InvalidArgumentException::class);
-
-        new PasswordHash('  ');
+        PasswordHash::fromEncodedHash('plain-text-password');
     }
 
     public function test_user_aggregate_can_be_created_with_valid_registration_data(): void
@@ -48,7 +47,9 @@ final class UserRegistrationTest extends TestCase
         $registeredAt = new DateTimeImmutable('2026-11-21T09:00:00+03:30');
         $id = new UserId('01JCS7ZJ4M6P7W8X9Y0Z1A2B3C');
         $email = new EmailAddress('alice@example.com');
-        $passwordHash = new PasswordHash('$2y$12$example-hash');
+        $passwordHash = PasswordHash::fromEncodedHash(
+            password_hash('test-password', PASSWORD_DEFAULT),
+        );
 
         $user = User::register($id, $email, $passwordHash, $registeredAt);
 
