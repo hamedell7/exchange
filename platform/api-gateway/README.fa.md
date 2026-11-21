@@ -32,14 +32,14 @@ URI اصلی هنگام ارسال درخواست به سرویس مقصد حف�
 docker build -t exchange-api-gateway:local ./platform/api-gateway
 ```
 
-## اجرا
+## اجرا روی شبکه مشترک
 
-فایل نمونه تنظیمات را کپی و آدرس سه سرویس را تنظیم کنید. کانتینر Gateway باید روی شبکه Docker مشترک با سرویس‌ها باشد یا نام میزبان‌های تنظیم‌شده از داخل کانتینر قابل دسترسی باشند.
+ابتدا زیرساخت را اجرا کنید تا شبکه Docker با نام دقیق `exchange-network` ساخته شود. سپس سرویس‌های مقصد را بالا بیاورید و Gateway را به همان شبکه متصل کنید؛ در غیر این صورت نام‌های میزبان سرویس‌ها از داخل Nginx resolve نمی‌شوند.
 
 ```powershell
 Copy-Item platform/api-gateway/.env.example platform/api-gateway/.env
 
-docker run --rm --name exchange-api-gateway --env-file platform/api-gateway/.env -p 127.0.0.1:8080:8080 exchange-api-gateway:local
+docker run --rm --name exchange-api-gateway --network exchange-network --env-file platform/api-gateway/.env -p 127.0.0.1:8080:8080 exchange-api-gateway:local
 ```
 
 بررسی سلامت:
@@ -73,4 +73,4 @@ Invoke-WebRequest http://127.0.0.1:8080/healthz
 
 اعتبارسنجی JWT/OIDC، سیاست CORS، گواهی TLS، Rate Limit توزیع‌شده، Circuit Breaker، Retry، تبدیل درخواست/پاسخ و مستندات اختصاصی API هنوز فعال نشده‌اند. این موارد به قرارداد Issuer/JWKS سرویس Identity، دامنه‌های مجاز Frontend، توپولوژی استقرار و قرارداد نهایی APIها نیاز دارند.
 
-به‌ویژه برای درخواست‌های نوشتنی مالی Retry خودکار فعال نشده است؛ چون ممکن است عملیات غیر idempotent را تکرار و باعث ثبت دوباره تراکنش شود.
+به‌ویژه برای درخواست‌های نوشتنی مالی Retry خودکار فعال نشده است؛ چون ممکن است عملیات non-idempotent را تکرار و باعث ثبت دوباره تراکنش شود.
