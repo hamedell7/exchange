@@ -157,7 +157,7 @@ final class LaravelPasswordHasher implements PasswordHasher
 ```php
 interface UserRepository
 {
-    public function existsByEmail(EmailAddress $email): bool;
+    public function existsByEmail(string $email): bool;
 
     public function save(User $user): void;
 }
@@ -176,22 +176,22 @@ final class RegisterUser
         private UserRepository $users,
         private PasswordHasher $passwordHasher,
         private UserIdGenerator $ids,
-        private Clock $clock,
     ) {}
 
-    public function execute(RegisterUserCommand $command): User
+    public function execute(string $name, string $email, string $plainPassword): User
     {
-        $email = new EmailAddress($command->email);
+        $emailAddress = new EmailAddress($email);
 
-        if ($this->users->existsByEmail($email)) {
-            throw new EmailAlreadyRegistered();
+        if ($this->users->existsByEmail($emailAddress->value())) {
+            throw EmailAlreadyRegistered::for($emailAddress->value());
         }
 
         $user = User::register(
-            id: $this->ids->next(),
-            email: $email,
-            passwordHash: $this->passwordHasher->hash($command->plainPassword),
-            registeredAt: $this->clock->now(),
+            id: $this->ids->generate(),
+            name: $name,
+            email: $emailAddress,
+            passwordHash: $this->passwordHasher->hash($plainPassword),
+            registeredAt: new DateTimeImmutable(),
         );
 
         $this->users->save($user);
@@ -201,10 +201,10 @@ final class RegisterUser
 }
 ```
 
-The names `UserIdGenerator` and `Clock` are ports because they isolate
-non-domain technical choices (ID generation and system time). They should be
-introduced only if the use case needs deterministic tests or a replaceable
-strategy; they are not mandatory abstractions for every application.
+The `UserIdGenerator` port isolates the ID-generation strategy from the
+Domain. The current use case uses `DateTimeImmutable` directly for its
+registration timestamp; a Clock port can be introduced later if deterministic
+time control becomes a real testing or business requirement.
 
 ### Domain
 
@@ -287,8 +287,23 @@ Use a pragmatic split:
 - **Trading:** stronger domain modeling around order lifecycle, market rules,
   matching, and trade invariants.
 
-For this learning slice, the next implementation step is to add the DDD
-registration use case and its adapters, then test the use case with in-memory
-fakes and the Domain without booting Laravel. Do not add a second live
-registration endpoint just to keep both styles in production. The conventional
-version above is the baseline for comparison, not a parallel production path.
+The first live DDD registration path is now implemented in this branch:
+
+- `POST /api/v1/identity/register` is registered through Laravel's API routing.
+- The controller validates the HTTP payload and delegates to `RegisterUser`.
+- The use case coordinates the `EmailAddress` and `User` domain objects with
+  the password-hashing, ID-generation, and persistence ports.
+- Infrastructure adapters use Laravel's Hash facade, ULIDs, and Eloquent.
+- The users table uses ULID primary keys to keep the domain identifier strategy
+  independent from database auto-increment behavior.
+- Feature tests cover successful registration, duplicate email rejection, and
+  password validation; domain tests cover the aggregate and value objects.
+
+The current implementation deliberately does not add login, token issuance,
+email verification, MFA, or cross-service events. Those are separate use cases
+and should be designed against the Identity service's actual authentication
+and session boundaries rather than being smuggled into registration.
+
+The conventional version above remains the comparison baseline, not a second
+live production endpoint. Tests have been authored but have not been executed
+in this environment; no passing test or CI result is claimed.

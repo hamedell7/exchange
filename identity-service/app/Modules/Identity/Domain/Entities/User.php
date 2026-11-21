@@ -8,19 +8,18 @@ use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
 use App\Modules\Identity\Domain\ValueObjects\PasswordHash;
 use App\Modules\Identity\Domain\ValueObjects\UserId;
 use DateTimeImmutable;
+use InvalidArgumentException;
 
 /**
  * Identity User aggregate root.
  *
- * This first slice models registration state only. Persistence, password
- * hashing, HTTP concerns and Laravel/Eloquent dependencies stay outside
- * the domain. Further lifecycle behavior is intentionally deferred until
- * the Identity bounded-context rules are agreed.
+ * Domain behavior remains independent of Laravel, Eloquent and HTTP.
  */
 final readonly class User
 {
     private function __construct(
         private UserId $id,
+        private string $name,
         private EmailAddress $email,
         private PasswordHash $passwordHash,
         private DateTimeImmutable $registeredAt,
@@ -29,16 +28,28 @@ final readonly class User
 
     public static function register(
         UserId $id,
+        string $name,
         EmailAddress $email,
         PasswordHash $passwordHash,
         DateTimeImmutable $registeredAt,
     ): self {
-        return new self($id, $email, $passwordHash, $registeredAt);
+        $name = trim($name);
+
+        if ($name === '') {
+            throw new InvalidArgumentException('A user name is required.');
+        }
+
+        return new self($id, $name, $email, $passwordHash, $registeredAt);
     }
 
     public function id(): UserId
     {
         return $this->id;
+    }
+
+    public function name(): string
+    {
+        return $this->name;
     }
 
     public function email(): EmailAddress

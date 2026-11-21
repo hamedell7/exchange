@@ -51,9 +51,10 @@ final class UserRegistrationTest extends TestCase
             password_hash('test-password', PASSWORD_DEFAULT),
         );
 
-        $user = User::register($id, $email, $passwordHash, $registeredAt);
+        $user = User::register($id, 'Alice Example', $email, $passwordHash, $registeredAt);
 
         self::assertTrue($id->equals($user->id()));
+        self::assertSame('Alice Example', $user->name());
         self::assertTrue($email->equals($user->email()));
         self::assertSame($passwordHash, $user->passwordHash());
         self::assertSame($registeredAt, $user->registeredAt());
