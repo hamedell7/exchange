@@ -5,43 +5,38 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Domain\Entities;
 
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
+use App\Modules\Identity\Domain\ValueObjects\PasswordHash;
+use App\Modules\Identity\Domain\ValueObjects\UserId;
 use DateTimeImmutable;
-use InvalidArgumentException;
 
 /**
  * Identity User aggregate root.
  *
- * This object contains domain state only. Persistence, password hashing,
- * HTTP concerns and Laravel/Eloquent dependencies belong outside the domain.
+ * This first slice models registration state only. Persistence, password
+ * hashing, HTTP concerns and Laravel/Eloquent dependencies stay outside
+ * the domain. Further lifecycle behavior is intentionally deferred until
+ * the Identity bounded-context rules are agreed.
  */
 final readonly class User
 {
     private function __construct(
-        private string $id,
+        private UserId $id,
         private EmailAddress $email,
-        private string $passwordHash,
+        private PasswordHash $passwordHash,
         private DateTimeImmutable $registeredAt,
     ) {
     }
 
     public static function register(
-        string $id,
+        UserId $id,
         EmailAddress $email,
-        string $passwordHash,
+        PasswordHash $passwordHash,
         DateTimeImmutable $registeredAt,
     ): self {
-        if (trim($id) === '') {
-            throw new InvalidArgumentException('A user identifier is required.');
-        }
-
-        if (trim($passwordHash) === '') {
-            throw new InvalidArgumentException('A password hash is required.');
-        }
-
         return new self($id, $email, $passwordHash, $registeredAt);
     }
 
-    public function id(): string
+    public function id(): UserId
     {
         return $this->id;
     }
@@ -51,7 +46,7 @@ final readonly class User
         return $this->email;
     }
 
-    public function passwordHash(): string
+    public function passwordHash(): PasswordHash
     {
         return $this->passwordHash;
     }
