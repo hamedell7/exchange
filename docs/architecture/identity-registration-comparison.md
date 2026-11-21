@@ -290,7 +290,7 @@ Use a pragmatic split:
 The first live DDD registration path is now implemented in this branch:
 
 - `POST /api/v1/identity/register` is registered through Laravel's API routing.
-- The controller validates the HTTP payload and delegates to `RegisterUser`.
+- `RegisterUserRequest` owns HTTP input normalization, validation rules, and validation messages; the controller only consumes validated data and delegates to `RegisterUser`.
 - The use case coordinates the `EmailAddress` and `User` domain objects with
   the password-hashing, ID-generation, and persistence ports.
 - Infrastructure adapters use Laravel's Hash facade, ULIDs, and Eloquent.
