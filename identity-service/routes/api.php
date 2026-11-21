@@ -5,6 +5,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/identity')->group(function (): void {
     Route::post('/register', RegistrationController::class)
-        ->middleware('throttle:registration')
+        ->middleware('throttle:10,1')
         ->name('identity.register');
 });
