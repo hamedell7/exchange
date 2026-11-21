@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Identity;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Identity\RegisterUserRequest;
+use App\Modules\Identity\Application\Commands\RegisterUserCommand;
 use App\Modules\Identity\Application\Exceptions\EmailAlreadyRegistered;
 use App\Modules\Identity\Application\UseCases\RegisterUser;
 use Illuminate\Http\JsonResponse;
@@ -21,9 +22,11 @@ final class RegistrationController extends Controller
 
         try {
             $user = $registerUser->execute(
-                $validated['name'],
-                $validated['email'],
-                $validated['password'],
+                new RegisterUserCommand(
+                    name: $validated['name'],
+                    email: $validated['email'],
+                    plainPassword: $validated['password'],
+                ),
             );
         } catch (EmailAlreadyRegistered) {
             throw ValidationException::withMessages([
