@@ -1,66 +1,43 @@
-# Exchange Platform Repository
+# Platform Components
 
-این مخزن فقط اجزای مشترک پلتفرم را نگهداری می‌کند؛ سورس سه Microservice در مخزن‌های مستقل قرار دارد.
+این پوشه اجزای مشترک پلتفرم Exchange را در همین Monorepo نگهداری می‌کند. سورس Microserviceها در پوشه‌های هم‌سطح `identity-service/`, `wallet-service/` و `trading-service/` قرار دارد.
 
 ## ساختار
 
 | مسیر | مسئولیت |
 |---|---|
 | `api-gateway/` | Nginx/API Gateway و مسیریابی ورودی؛ مستقل از سرویس‌ها اجرا و Deploy می‌شود. |
-| `infrastructure/` | Docker Compose توسعه محلی، PostgreSQL، Redis، RabbitMQ و اسکریپت‌های زیرساخت |
+| `infrastructure/` | Docker Compose توسعه محلی، PostgreSQL، Redis، RabbitMQ و شبکه مشترک |
 | `contracts/` | قراردادهای بین‌سرویسی، OpenAPI و Schema رویدادها |
 | `docs/` | معماری کلان، ADRها، عملیات و مدل دسترسی |
 
 ## استقلال اجرایی
 
-قرار گرفتن Gateway و Infrastructure در یک Git Repository به معنی اجرای یکپارچه آن‌ها نیست. Gateway، زیرساخت و هر Microservice همچنان Process/Container، تنظیمات، Health Check و چرخه انتشار مستقل خود را دارند. فایل Compose فعلی فقط زیرساخت محلی را اجرا می‌کند.
+قرار گرفتن این اجزا و سه Microservice در یک Git Repository به معنی اجرای یکپارچه آن‌ها نیست. Gateway، زیرساخت و هر Microservice همچنان Process/Container، تنظیمات، Health Check و چرخه انتشار مستقل خود را دارند. Compose زیرساخت فقط وابستگی‌های مشترک پلتفرم را اجرا می‌کند.
 
-## تنظیم و اجرای زیرساخت محلی (Windows CMD)
+## تنظیم و اجرای زیرساخت محلی
 
-در این مخزن:
+از ریشه Monorepo در PowerShell:
 
-```cmd
-cd infrastructure
-copy .env.example .env
-notepad .env
+```powershell
+if (-not (Test-Path .\platform\infrastructure\.env)) {
+    Copy-Item .\platform\infrastructure\.env.example .\platform\infrastructure\.env
+}
+docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml config --quiet
+docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d
 ```
 
-مقادیر `.env.example` فقط برای توسعه محلی هستند. فایل `.env` در Git نادیده گرفته می‌شود.
+این Compose شبکه مشترک `exchange-network` را با نام ثابت ایجاد می‌کند. سه سرویس و Gateway به آن متصل می‌شوند؛ آن را به‌صورت دستی ایجاد نکنید.
 
-راه‌اندازی:
-
-```cmd
-docker compose config --quiet
-docker compose up -d
-docker compose ps
-```
-
-ساخت نقش‌ها و دیتابیس‌های مستقل سرویس‌ها:
+برای ایجاد Roleها و Databaseهای توسعه در PostgreSQL زیرساخت:
 
 ```cmd
-scripts\bootstrap-databases.cmd
+platform\infrastructure\scripts\bootstrap-databases.cmd
 ```
 
-یا از مسیر `infrastructure`:
+## دیتابیس و امنیت
 
-```cmd
-scripts\bootstrap-databases.cmd
-```
-
-## دیتابیس‌ها
-
-- `identity_db` با کاربر `identity_app`
-- `wallet_db` با کاربر `wallet_app`
-- `trading_db` با کاربر `trading_app`
-
-هیچ سرویس اجازه دسترسی مستقیم به دیتابیس سرویس دیگر را ندارد.
-
-## دسترسی توسعه‌دهندگان
-
-توسعه‌دهنده هر سرویس باید فقط به مخزن سرویس مربوطه دسترسی Write داشته باشد. دسترسی Read به این مخزن مشترک می‌تواند برای مشاهده قراردادها و مستندات لازم داده شود؛ این دسترسی، سورس سرویس‌های Identity، Wallet یا Trading را افشا نمی‌کند، چون آن سورس‌ها در مخزن‌های جدا هستند. این مخزن نباید شامل Secretهای Production یا اطلاعات حساس عملیاتی باشد.
-
-اگر در آینده لازم شد Gateway یا Infrastructure از دید محرمانگی هم از توسعه‌دهندگان سرویس‌ها پنهان بماند، می‌توان `contracts/` را به یک بسته/مخزن قابل‌انتشار مستقل تبدیل کرد؛ در نسخه فعلی عمداً تعداد مخزن‌ها را کم نگه می‌داریم.
-
-## Laravel
-
-هیچ پروژه Laravel در این بسته نصب نشده است. برنامه هر سرویس در فاز جداگانه داخل مسیر `application/` همان مخزن ساخته خواهد شد.
+- هر سرویس باید با Credential مختص خودش و فقط به دیتابیس مالک خود متصل شود.
+- ارتباط داده‌ای بین سرویس‌ها از طریق API یا Event است؛ نه Query مستقیم به دیتابیس سرویس دیگر.
+- رمزهای نمونه فقط برای توسعه محلی‌اند و نباید در Production استفاده شوند.
+- Secretهای Production نباید در Git ثبت شوند.
