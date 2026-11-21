@@ -4,24 +4,30 @@ Laravel 13 application skeleton for the Exchange identity-service service.
 
 ## Run with Docker
 
-Create the shared application network once (if it does not exist):
+Create the shared application network once if it does not already exist:
 
 ```bash
 docker network create exchange-network
 ```
 
-Start the service from this directory:
+Copy the environment template and generate an application key:
+
+```bash
+cp .env.example .env
+docker compose run --rm app php artisan key:generate --show
+```
+
+Copy the generated key into the `APP_KEY` value in `.env`, then start the service:
 
 ```bash
 docker compose up -d --build
-docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate
 ```
 
 The application is available at `http://localhost:8001`.
 
-The PostgreSQL database is private to this service and is not exposed on the host. The application joins the shared `exchange-network` so the API Gateway can reach it by its service container name. The database uses a separate internal Docker network.
+PostgreSQL is private to this service and is not published on the host. The application joins the shared `exchange-network` so the API Gateway and other platform components can reach it by container name. The database uses a separate internal Docker network.
 
-Copy `.env.example` to `.env` when running Laravel commands outside the container. For Compose, database connection settings are supplied directly by the Compose file. Override `DB_PASSWORD` and `APP_KEY` through the environment for non-local environments.
+Override local credentials in `.env` before starting. Never use the sample credentials in production.
 
 This is an uncustomized Laravel starting point. No domain modules, business rules, authentication flows, or service APIs have been added.
