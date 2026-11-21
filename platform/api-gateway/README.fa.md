@@ -1,40 +1,40 @@
-# API Gateway
+# درگاه API (API Gateway)
 
-Nginx edge gateway for the Exchange platform. This component is intentionally stateless: it does not own users, balances, orders, permissions, or business workflows.
+این مؤلفه لایه ورودی پلتفرم Exchange است و با Nginx پیاده‌سازی شده است. Gateway بدون وضعیت (Stateless) است و مالک کاربر، موجودی، سفارش، مجوز دامنه‌ای یا منطق تجاری نیست.
 
-## Current routes
+## مسیرهای فعلی
 
-| Public path | Upstream |
+| مسیر عمومی | سرویس مقصد |
 |---|---|
-| `/api/v1/identity/*` | Identity service |
-| `/api/v1/trading/*` | Trading service |
-| `/api/v1/wallet/*` | Wallet service |
-| `/healthz` | Gateway process health |
+| `/api/v1/identity/*` | Identity Service |
+| `/api/v1/trading/*` | Trading Service |
+| `/api/v1/wallet/*` | Wallet Service |
+| `/healthz` | سلامت پردازش Gateway |
 
-The original URI is preserved when proxying. The three service applications must expose matching route prefixes, or the prefixes must be changed here once their API contracts are finalized.
+URI اصلی هنگام ارسال درخواست به سرویس مقصد حفظ می‌شود. برنامه هر سرویس باید همین پیشوندها را ارائه کند؛ در غیر این صورت، پس از نهایی‌شدن قرارداد API باید مسیرهای Gateway با آن قراردادها هماهنگ شوند.
 
-## Included edge protections
+## قابلیت‌های پیاده‌سازی‌شده
 
-- Per-client request rate limiting and concurrent connection limiting.
-- Request body size and client timeout limits.
-- Explicit upstream connect/read/write timeouts.
-- Request ID generated at the gateway and forwarded to the upstream.
-- Basic security response headers and hidden Nginx version.
-- A local process health endpoint.
+- محدودسازی نرخ درخواست و تعداد اتصال هم‌زمان به‌ازای IP.
+- محدودیت اندازه بدنه درخواست و Timeoutهای کلاینت.
+- Timeout مستقل برای اتصال، ارسال و دریافت از سرویس‌های مقصد.
+- تولید Request ID در Gateway و ارسال آن به سرویس مقصد.
+- هدرهای امنیتی پایه و مخفی‌کردن نسخه Nginx.
+- Endpoint سلامت محلی.
 
-Rate limits are initial development defaults, not production capacity decisions. Tune them using load tests and the expected traffic profile.
+مقادیر Rate Limit فعلی صرفاً پیش‌فرض شروع توسعه‌اند و باید با تست بار و الگوی ترافیک واقعی تنظیم شوند.
 
-## Build
+## ساخت Image
 
-Run from the repository root:
+از ریشه مخزن اجرا کنید:
 
 ```powershell
 docker build -t exchange-api-gateway:local ./platform/api-gateway
 ```
 
-## Run
+## اجرا
 
-Copy `.env.example` to `.env` and set the three upstream addresses. The gateway container must share a Docker network with the upstream containers, or the configured hostnames must be reachable from inside the gateway container.
+فایل نمونه تنظیمات را کپی و آدرس سه سرویس را تنظیم کنید. کانتینر Gateway باید روی شبکه Docker مشترک با سرویس‌ها باشد یا نام میزبان‌های تنظیم‌شده از داخل کانتینر قابل دسترسی باشند.
 
 ```powershell
 Copy-Item platform/api-gateway/.env.example platform/api-gateway/.env
@@ -42,33 +42,35 @@ Copy-Item platform/api-gateway/.env.example platform/api-gateway/.env
 docker run --rm --name exchange-api-gateway --env-file platform/api-gateway/.env -p 127.0.0.1:8080:8080 exchange-api-gateway:local
 ```
 
-Check the gateway:
+بررسی سلامت:
 
 ```powershell
 Invoke-WebRequest http://127.0.0.1:8080/healthz
 ```
 
-The health endpoint only confirms that Nginx is running; it does not prove that all upstream services are healthy.
+این Endpoint فقط اجرای Nginx را بررسی می‌کند و سلامت سرویس‌های مقصد را تضمین نمی‌کند.
 
-## Configuration
+## تنظیمات سرویس‌های مقصد
 
-All upstream values are required at container startup:
+تمام متغیرهای زیر هنگام شروع کانتینر الزامی هستند:
 
-- `IDENTITY_SERVICE_HOST`, `IDENTITY_SERVICE_PORT`
-- `TRADING_SERVICE_HOST`, `TRADING_SERVICE_PORT`
-- `WALLET_SERVICE_HOST`, `WALLET_SERVICE_PORT`
+- `IDENTITY_SERVICE_HOST` و `IDENTITY_SERVICE_PORT`
+- `TRADING_SERVICE_HOST` و `TRADING_SERVICE_PORT`
+- `WALLET_SERVICE_HOST` و `WALLET_SERVICE_PORT`
 
-See `.env.example` for local placeholders. Never commit real credentials or production hostnames.
+مقادیر نمونه در `.env.example` قرار دارند. هیچ Secret یا آدرس حساس Production را در Git ثبت نکنید.
 
-## Security boundaries
+## مرزهای امنیتی
 
-- TLS must terminate at a trusted load balancer/ingress in production, or be configured directly for the gateway before exposing it publicly.
-- Do not trust client-supplied identity headers. This gateway does not synthesize authenticated user identity.
-- The gateway does not replace JWT signature/issuer/audience validation or authorization in the owning services.
-- Services must enforce object-level and action-level authorization themselves.
-- Only trust forwarded client IP/protocol headers from a known upstream proxy. Configure the real-IP module and trusted proxy ranges explicitly if another proxy sits in front.
-- Keep the gateway and services on private networks; do not publish service ports publicly.
+- در Production، TLS باید در Load Balancer/Ingress مورد اعتماد خاتمه یابد یا TLS مستقیماً برای Gateway پیکربندی شود؛ Gateway فعلی فقط HTTP روی پورت 8080 ارائه می‌کند.
+- هدرهای هویتی ارسالی از سمت Client قابل اعتماد نیستند. این Gateway هویت احراز‌شده کاربر را جعل یا تولید نمی‌کند.
+- Gateway جایگزین اعتبارسنجی امضای JWT، Issuer، Audience یا مجوزدهی در سرویس مالک دامنه نیست.
+- هر سرویس باید مجوز دسترسی به منبع و عملیات را مستقلاً بررسی کند.
+- اگر Proxy دیگری جلوی Gateway قرار گرفت، فقط بازه IP پروکسی‌های مورد اعتماد را برای Forwarded Headers مجاز کنید.
+- Gateway و سرویس‌ها باید در شبکه خصوصی باشند و پورت سرویس‌ها مستقیماً در اینترنت منتشر نشود.
 
-## Deliberate non-goals for this first slice
+## موارد عمداً خارج از این مرحله
 
-JWT/OIDC validation, CORS policy, TLS certificates, distributed rate limiting, circuit breaking, retries, request/response transformation, and service-specific API documentation are not enabled yet. They require the identity issuer/JWKS contract, frontend origin policy, deployment topology, and finalized service API contracts. In particular, the gateway does not retry financial write requests because retries can duplicate non-idempotent operations.
+اعتبارسنجی JWT/OIDC، سیاست CORS، گواهی TLS، Rate Limit توزیع‌شده، Circuit Breaker، Retry، تبدیل درخواست/پاسخ و مستندات اختصاصی API هنوز فعال نشده‌اند. این موارد به قرارداد Issuer/JWKS سرویس Identity، دامنه‌های مجاز Frontend، توپولوژی استقرار و قرارداد نهایی APIها نیاز دارند.
+
+به‌ویژه برای درخواست‌های نوشتنی مالی Retry خودکار فعال نشده است؛ چون ممکن است عملیات غیر idempotent را تکرار و باعث ثبت دوباره تراکنش شود.
