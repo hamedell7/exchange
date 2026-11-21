@@ -1,0 +1,200 @@
+{
+  "info": {
+    "_postman_id": "d3e9f1c8-31a1-4d2b-9b8f-identity000001",
+    "name": "Exchange API - Local Development",
+    "description": "مجموعه تست APIهای پیاده‌سازی‌شده Exchange. در وضعیت فعلی فقط Health و ثبت‌نام Identity فعال هستند.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "registrationEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "registrationPassword",
+      "value": "ExchangeLocal!2026",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Identity Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{identityBaseUrl}}/up",
+            "description": "بررسی سلامت اپلیکیشن Identity."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Health response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test User\",\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"{{registrationPassword}}\",\n  \"password_confirmation\": \"{{registrationPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{identityBaseUrl}}/api/v1/identity/register",
+            "description": "ثبت‌نام کاربر آزمایشی. ایمیل به‌صورت خودکار برای اجرای اول ساخته و در Collection Variable نگهداری می‌شود."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('registrationEmail')) {",
+                  "  const uniqueEmail = `postman.${Date.now()}@example.test`;",
+                  "  pm.collectionVariables.set('registrationEmail', uniqueEmail);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201 Created', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Response contains registered user data', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('data');",
+                  "  pm.expect(body.data).to.have.property('id').that.is.a('string').and.not.empty;",
+                  "  pm.expect(body.data.name).to.eql('Postman Test User');",
+                  "  pm.expect(body.data.email).to.eql(pm.collectionVariables.get('registrationEmail'));",
+                  "  pm.expect(body.data).to.have.property('registered_at');",
+                  "});",
+                  "if (pm.response.code === 201) { pm.collectionVariables.set('registeredUserId', pm.response.json().data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Duplicate Email (expect 422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Duplicate Test User\",\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"{{registrationPassword}}\",\n  \"password_confirmation\": \"{{registrationPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{identityBaseUrl}}/api/v1/identity/register",
+            "description": "پس از اجرای موفق Register User اجرا شود؛ همان ایمیل باید به‌عنوان تکراری رد شود."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422 Unprocessable Entity', function () { pm.response.to.have.status(422); });",
+                  "pm.test('Email validation error is returned', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('errors');",
+                  "  pm.expect(body.errors).to.have.property('email');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Invalid Payload (expect 422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"email\": \"not-an-email\",\n  \"password\": \"short\",\n  \"password_confirmation\": \"different\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{identityBaseUrl}}/api/v1/identity/register",
+            "description": "تست ورودی نامعتبر؛ باید خطاهای validation با status 422 برگردند."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422 Unprocessable Entity', function () { pm.response.to.have.status(422); });",
+                  "pm.test('Validation errors are present', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('errors');",
+                  "  pm.expect(body.errors).to.have.property('name');",
+                  "  pm.expect(body.errors).to.have.property('email');",
+                  "  pm.expect(body.errors).to.have.property('password');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
