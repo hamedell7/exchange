@@ -287,8 +287,23 @@ Use a pragmatic split:
 - **Trading:** stronger domain modeling around order lifecycle, market rules,
   matching, and trade invariants.
 
-For this learning slice, the next implementation step is to add the DDD
-registration use case and its adapters, then test the use case with in-memory
-fakes and the Domain without booting Laravel. Do not add a second live
-registration endpoint just to keep both styles in production. The conventional
-version above is the baseline for comparison, not a parallel production path.
+The first live DDD registration path is now implemented in this branch:
+
+- `POST /api/v1/identity/register` is registered through Laravel's API routing.
+- The controller validates the HTTP payload and delegates to `RegisterUser`.
+- The use case coordinates the `EmailAddress` and `User` domain objects with
+  the password-hashing, ID-generation, and persistence ports.
+- Infrastructure adapters use Laravel's Hash facade, ULIDs, and Eloquent.
+- The users table uses ULID primary keys to keep the domain identifier strategy
+  independent from database auto-increment behavior.
+- Feature tests cover successful registration, duplicate email rejection, and
+  password validation; domain tests cover the aggregate and value objects.
+
+The current implementation deliberately does not add login, token issuance,
+email verification, MFA, or cross-service events. Those are separate use cases
+and should be designed against the Identity service's actual authentication
+and session boundaries rather than being smuggled into registration.
+
+The conventional version above remains the comparison baseline, not a second
+live production endpoint. Tests have been authored but have not been executed
+in this environment; no passing test or CI result is claimed.
