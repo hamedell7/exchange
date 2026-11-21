@@ -1,65 +1,71 @@
-# Exchange Platform Workspace (4 Repositories)
+# Exchange Platform
 
-این پوشه فقط Workspace محلی است و خودش Git Repository نیست. چهار مخزن مستقل درون آن قرار دارند.
+این مخزن یک **Monorepo با مرزهای اجرایی مستقل** است. هر Microservice چرخه اجرای Docker، تنظیمات محیطی، وابستگی‌ها و دیتابیس خودش را دارد؛ اجزای مشترک پلتفرم هم زیر `platform/` نگهداری می‌شوند.
 
-## ساختار نهایی
+## ساختار مخزن
 
 ```text
-exchange-platform-workspace/
-├── exchange-platform/             # Gateway + Infrastructure + Contracts + Docs
-├── exchange-identity-service/     # Microservice مستقل Identity
-├── exchange-wallet-service/       # Microservice مستقل Wallet
-├── exchange-trading-service/      # Microservice مستقل Trading
-└── scripts/                       # ابزارهای مدیریت Workspace (خارج از Git)
+exchange/
+├── identity-service/       # Laravel Identity service
+├── wallet-service/         # Laravel Wallet service
+├── trading-service/        # Laravel Trading service
+└── platform/
+    ├── api-gateway/         # Nginx API Gateway
+    ├── infrastructure/     # PostgreSQL, Redis, RabbitMQ و شبکه مشترک
+    ├── contracts/           # OpenAPI و Integration Event contracts
+    └── docs/                # معماری، ADRها و Runbookها
 ```
 
-## ایجاد Git Repositoryهای محلی
+## مرزهای Docker در توسعه محلی
 
-از CMD در ریشه Workspace اجرا کنید:
+- هر Laravel service با Compose مستقل اجرا می‌شود.
+- سورس هر سرویس به‌صورت Bind Mount از پوشه همان سرویس به `/var/www/html` متصل است؛ ویرایش فایل‌ها روی Host بلافاصله داخل کانتینر دیده می‌شود.
+- پوشه `vendor` هر سرویس Named Volume مستقل دارد تا Composer dependencyهای Linux با فایل‌های Host ویندوز مخلوط نشوند.
+- دیتابیس هر سرویس و داده‌های زیرساخت در Named Volumeهای مستقل نگهداری می‌شوند.
+- زیرساخت مالک شبکه مشترک با نام ثابت `exchange-network` است. سرویس‌ها و Gateway آن را مصرف می‌کنند؛ شبکه را دستی نسازید.
+- Bind Mount سورس فقط برای Development است. Production باید از Image ساخته‌شده و بدون Mount سورس استفاده کند.
 
-```cmd
-scripts\init-repositories.cmd
-scripts\status-repositories.cmd
+## راه‌اندازی در Windows PowerShell
+
+ابتدا فایل‌های محیطی را فقط در صورت نبودن ایجاد کنید:
+
+```powershell
+if (-not (Test-Path .\platform\infrastructure\.env)) {
+    Copy-Item .\platform\infrastructure\.env.example .\platform\infrastructure\.env
+}
+if (-not (Test-Path .\identity-service\.env)) {
+    Copy-Item .\identity-service\.env.example .\identity-service\.env
+}
+if (-not (Test-Path .\wallet-service\.env)) {
+    Copy-Item .\wallet-service\.env.example .\wallet-service\.env
+}
+if (-not (Test-Path .\trading-service\.env)) {
+    Copy-Item .\trading-service\.env.example .\trading-service\.env
+}
 ```
 
-این دستورات برای هرکدام از چهار پوشه `git init` جداگانه اجرا می‌کنند؛ روی ریشه Workspace دستور `git init` اجرا نکنید.
+زیرساخت را اجرا کنید:
 
-## راه‌اندازی زیرساخت در صورت وجود محیط قبلی
-
-اگر PostgreSQL/Redis/RabbitMQ قبلاً از مسیر `C:\xampp\htdocs\exchange-platform` اجرا شده‌اند، فایل `.env` را به مسیر جدید زیر کپی کنید تا رمز و Volumeهای فعلی حفظ شوند:
-
-```cmd
-copy C:\xampp\htdocs\exchange-platform\.env exchange-platform\infrastructure\.env
+```powershell
+docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d
 ```
 
-سپس از داخل مخزن Platform:
+سپس هر سرویس را مستقل Build و اجرا کنید. برای نمونه:
 
-```cmd
-cd exchange-platform\infrastructure
-docker compose config --quiet
-docker compose ps
+```powershell
+docker compose --env-file identity-service/.env -f identity-service/compose.yaml up -d --build
+docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml up -d --build
+docker compose --env-file trading-service/.env -f trading-service/compose.yaml up -d --build
 ```
 
-نام پروژه Compose همچنان `exchange-platform` است تا با استک قبلی هم‌نام بماند. برای حفظ داده‌ها هرگز `docker compose down -v` اجرا نکنید.
+برای ساخت APP_KEY هر سرویس، دستور زیر را با مسیر Compose و env همان سرویس اجرا کنید:
 
-اگر زیرساخت قبلی ندارید، از `exchange-platform\infrastructure\.env.example` یک `.env` بسازید و فقط برای Development مقادیر مناسب قرار دهید.
-
-## ساخت دیتابیس‌های مستقل
-
-بعد از اطمینان از سالم بودن PostgreSQL، از مسیر `exchange-platform\infrastructure` اجرا کنید:
-
-```cmd
-scripts\bootstrap-databases.cmd
+```powershell
+docker compose --env-file identity-service/.env -f identity-service/compose.yaml exec app php artisan key:generate
 ```
 
-این اسکریپت سه Role و سه Database مستقل می‌سازد: Identity، Wallet و Trading.
+همین دستور برای Wallet و Trading نیز با مسیر مربوط به خودشان اجرا می‌شود. سپس Migration همان سرویس را اجرا کنید. راهنمای کامل هر سرویس در README همان پوشه قرار دارد.
 
-## Laravel
+## نگهداری داده‌ها
 
-هیچ Laravel application در این Workspace نصب نشده است. هر برنامه بعداً داخل مسیر `application/` در مخزن سرویس خودش ساخته می‌شود.
-
-## دسترسی تیم
-
-- هر توسعه‌دهنده سرویس فقط به مخزن سرویس خودش Write می‌گیرد.
-- در صورت نیاز به قراردادها و مستندات، به `exchange-platform` فقط Read داده می‌شود.
-- دسترسی به Infrastructure/Production Secrets و منابع Runtime جداگانه کنترل می‌شود.
+دستور `docker compose down` کانتینرها را متوقف و حذف می‌کند اما Named Volumeها را نگه می‌دارد. از `down -v` فقط زمانی استفاده کنید که عمداً قصد حذف داده دیتابیس و وابستگی‌ها را دارید.
