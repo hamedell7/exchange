@@ -157,7 +157,7 @@ final class LaravelPasswordHasher implements PasswordHasher
 ```php
 interface UserRepository
 {
-    public function existsByEmail(EmailAddress $email): bool;
+    public function existsByEmail(string $email): bool;
 
     public function save(User $user): void;
 }
@@ -176,22 +176,22 @@ final class RegisterUser
         private UserRepository $users,
         private PasswordHasher $passwordHasher,
         private UserIdGenerator $ids,
-        private Clock $clock,
     ) {}
 
-    public function execute(RegisterUserCommand $command): User
+    public function execute(string $name, string $email, string $plainPassword): User
     {
-        $email = new EmailAddress($command->email);
+        $emailAddress = new EmailAddress($email);
 
-        if ($this->users->existsByEmail($email)) {
-            throw new EmailAlreadyRegistered();
+        if ($this->users->existsByEmail($emailAddress->value())) {
+            throw EmailAlreadyRegistered::for($emailAddress->value());
         }
 
         $user = User::register(
-            id: $this->ids->next(),
-            email: $email,
-            passwordHash: $this->passwordHasher->hash($command->plainPassword),
-            registeredAt: $this->clock->now(),
+            id: $this->ids->generate(),
+            name: $name,
+            email: $emailAddress,
+            passwordHash: $this->passwordHasher->hash($plainPassword),
+            registeredAt: new DateTimeImmutable(),
         );
 
         $this->users->save($user);
@@ -201,10 +201,10 @@ final class RegisterUser
 }
 ```
 
-The names `UserIdGenerator` and `Clock` are ports because they isolate
-non-domain technical choices (ID generation and system time). They should be
-introduced only if the use case needs deterministic tests or a replaceable
-strategy; they are not mandatory abstractions for every application.
+The `UserIdGenerator` port isolates the ID-generation strategy from the
+Domain. The current use case uses `DateTimeImmutable` directly for its
+registration timestamp; a Clock port can be introduced later if deterministic
+time control becomes a real testing or business requirement.
 
 ### Domain
 
