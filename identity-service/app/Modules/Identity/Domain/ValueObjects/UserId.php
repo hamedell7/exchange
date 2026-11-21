@@ -12,10 +12,11 @@ final readonly class UserId
 
     public function __construct(string $value)
     {
-        $value = trim($value);
+        $value = strtoupper(trim($value));
 
-        if ($value === '') {
-            throw new InvalidArgumentException('A user identifier is required.');
+        // ULID: 26 Crockford Base32 characters; the first character is 0-7.
+        if (preg_match('/\A[0-7][0-9A-HJKMNP-TV-Z]{25}\z/', $value) !== 1) {
+            throw new InvalidArgumentException('A valid ULID user identifier is required.');
         }
 
         $this->value = $value;

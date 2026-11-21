@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Providers;
 
 use App\Modules\Identity\Application\Contracts\PasswordHasher;
@@ -7,7 +9,7 @@ use App\Modules\Identity\Application\Contracts\UserIdGenerator;
 use App\Modules\Identity\Application\Contracts\UserRepository;
 use App\Modules\Identity\Infrastructure\Hashing\LaravelPasswordHasher;
 use App\Modules\Identity\Infrastructure\Identifiers\UlidUserIdGenerator;
-use App\Modules\Identity\Infrastructure\Persistence\EloquentUserRepository;
+use App\Modules\Identity\Infrastructure\Persistence\Eloquent\EloquentUserRepository;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
