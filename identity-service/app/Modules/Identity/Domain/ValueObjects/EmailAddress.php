@@ -12,13 +12,19 @@ final readonly class EmailAddress
 
     public function __construct(string $value)
     {
-        $normalized = strtolower(trim($value));
+        $candidate = trim($value);
 
-        if ($normalized === '' || filter_var($normalized, FILTER_VALIDATE_EMAIL) === false) {
+        if ($candidate === '' || filter_var($candidate, FILTER_VALIDATE_EMAIL) === false) {
             throw new InvalidArgumentException('The email address is invalid.');
         }
 
-        $this->value = $normalized;
+        $separator = strrpos($candidate, '@');
+        $localPart = substr($candidate, 0, $separator);
+        $domain = strtolower(substr($candidate, $separator + 1));
+
+        // The domain is case-insensitive. Preserve the local part because
+        // email standards do not guarantee that it is case-insensitive.
+        $this->value = $localPart.'@'.$domain;
     }
 
     public function value(): string
