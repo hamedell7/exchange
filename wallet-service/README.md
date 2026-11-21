@@ -1,33 +1,54 @@
-# wallet-service
+# Wallet Service
 
-Laravel 13 application skeleton for the Exchange wallet-service service.
+Laravel 13 application for the Exchange wallet microservice.
 
-## Run with Docker
+## Local Docker development (PowerShell, from the repository root)
 
-Create the shared application network once if it does not already exist:
+Create the environment file once:
 
-```bash
-docker network create exchange-network
+```powershell
+if (-not (Test-Path .\platform\infrastructure\.env)) {
+    Copy-Item .\platform\infrastructure\.env.example .\platform\infrastructure\.env
+}
+if (-not (Test-Path .\wallet-service\.env)) {
+    Copy-Item .\wallet-service\.env.example .\wallet-service\.env
+}
 ```
 
-Copy the environment template and generate an application key:
+Start shared infrastructure, which creates the external network `exchange-network`:
 
-```bash
-cp .env.example .env
-docker compose run --rm app php artisan key:generate --show
+```powershell
+docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d
 ```
 
-Copy the generated key into the `APP_KEY` value in `.env`, then start the service:
+Build and start Wallet, generate its key, and run migrations:
 
-```bash
-docker compose up -d --build
-docker compose exec app php artisan migrate
+```powershell
+docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml up -d --build
+docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml exec app php artisan key:generate
+docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml exec app php artisan migrate
 ```
 
-The application is available at `http://localhost:8003`.
+The API is available at [http://localhost:8003](http://localhost:8003).
 
-PostgreSQL is private to this service and is not published on the host. The application joins the shared `exchange-network` so the API Gateway and other platform components can reach it by container name. The database uses a separate internal Docker network.
+## Development volume model
 
-Override local credentials in `.env` before starting. Never use the sample credentials in production.
+- `wallet-service/.` is bind-mounted to `/var/www/html`, so host source changes appear immediately in the container.
+- `wallet_vendor` is a named Docker volume for Linux Composer dependencies; it is mounted inside the source tree at `vendor`.
+- `wallet_postgres_data` persists Wallet's PostgreSQL data independently.
 
-This is an uncustomized Laravel starting point. No domain modules, business rules, authentication flows, or service APIs have been added.
+The generated `APP_KEY` is saved to `wallet-service/.env` through the bind mount. Compose does not set an empty `APP_KEY` that could override the file value.
+
+After changing `composer.lock`, run:
+
+```powershell
+docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml exec app composer install
+```
+
+Stop without deleting persistent data:
+
+```powershell
+docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml down
+```
+
+Avoid `down -v` unless deleting the database and dependency volumes is intentional. This bind-mounted configuration is for development; production should run the built image without mounting the source tree.
