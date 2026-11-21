@@ -13,14 +13,6 @@ final class RegisterUserRequest extends FormRequest
         return true;
     }
 
-    protected function prepareForValidation(): void
-    {
-        $this->merge([
-            'name' => is_string($this->input('name')) ? trim($this->input('name')) : $this->input('name'),
-            'email' => is_string($this->input('email')) ? trim($this->input('email')) : $this->input('email'),
-        ]);
-    }
-
     /**
      * @return array<string, array<int, string>>
      */
