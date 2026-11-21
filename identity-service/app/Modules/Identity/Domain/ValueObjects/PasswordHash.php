@@ -14,15 +14,17 @@ use InvalidArgumentException;
  */
 final readonly class PasswordHash
 {
-    private string $value;
-
-    public function __construct(string $value)
+    private function __construct(private string $value)
     {
-        if (trim($value) === '') {
-            throw new InvalidArgumentException('A password hash is required.');
+    }
+
+    public static function fromEncodedHash(string $value): self
+    {
+        if (trim($value) === '' || password_get_info($value)['algo'] === null) {
+            throw new InvalidArgumentException('A valid encoded password hash is required.');
         }
 
-        $this->value = $value;
+        return new self($value);
     }
 
     public function value(): string
