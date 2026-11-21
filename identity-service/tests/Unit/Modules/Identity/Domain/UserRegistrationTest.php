@@ -6,17 +6,19 @@ namespace Tests\Unit\Modules\Identity\Domain;
 
 use App\Modules\Identity\Domain\Entities\User;
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
+use App\Modules\Identity\Domain\ValueObjects\PasswordHash;
+use App\Modules\Identity\Domain\ValueObjects\UserId;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class UserRegistrationTest extends TestCase
 {
-    public function test_email_address_is_normalized(): void
+    public function test_email_address_trims_input_and_normalizes_domain_only(): void
     {
         $email = new EmailAddress('  Alice.Example@Example.COM  ');
 
-        self::assertSame('alice.example@example.com', $email->value());
+        self::assertSame('Alice.Example@example.com', $email->value());
     }
 
     public function test_invalid_email_address_is_rejected(): void
@@ -26,45 +28,33 @@ final class UserRegistrationTest extends TestCase
         new EmailAddress('not-an-email');
     }
 
+    public function test_user_id_rejects_blank_values_and_trims_valid_values(): void
+    {
+        self::assertSame('user-123', (new UserId(' user-123 '))->value());
+
+        $this->expectException(InvalidArgumentException::class);
+        new UserId('  ');
+    }
+
+    public function test_password_hash_rejects_blank_values(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PasswordHash('  ');
+    }
+
     public function test_user_aggregate_can_be_created_with_valid_registration_data(): void
     {
         $registeredAt = new DateTimeImmutable('2026-11-21T09:00:00+03:30');
+        $id = new UserId('01JCS7ZJ4M6P7W8X9Y0Z1A2B3C');
         $email = new EmailAddress('alice@example.com');
+        $passwordHash = new PasswordHash('$2y$12$example-hash');
 
-        $user = User::register(
-            '01JCS7ZJ4M6P7W8X9Y0Z1A2B3C',
-            $email,
-            '$2y$12$example-hash',
-            $registeredAt,
-        );
+        $user = User::register($id, $email, $passwordHash, $registeredAt);
 
-        self::assertSame('01JCS7ZJ4M6P7W8X9Y0Z1A2B3C', $user->id());
+        self::assertTrue($id->equals($user->id()));
         self::assertTrue($email->equals($user->email()));
-        self::assertSame('$2y$12$example-hash', $user->passwordHash());
+        self::assertSame($passwordHash, $user->passwordHash());
         self::assertSame($registeredAt, $user->registeredAt());
-    }
-
-    public function test_user_cannot_be_registered_without_an_identifier(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-
-        User::register(
-            ' ',
-            new EmailAddress('alice@example.com'),
-            '$2y$12$example-hash',
-            new DateTimeImmutable(),
-        );
-    }
-
-    public function test_user_cannot_be_registered_without_a_password_hash(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-
-        User::register(
-            '01JCS7ZJ4M6P7W8X9Y0Z1A2B3C',
-            new EmailAddress('alice@example.com'),
-            ' ',
-            new DateTimeImmutable(),
-        );
     }
 }
