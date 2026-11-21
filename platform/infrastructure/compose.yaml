@@ -70,4 +70,5 @@ volumes:
 
 networks:
   exchange-network:
+    name: exchange-network
     driver: bridge
