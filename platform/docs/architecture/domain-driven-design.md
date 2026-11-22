@@ -144,16 +144,20 @@ The registration vertical slice follows these rules:
 - User is the Identity Domain Aggregate Root; currently it is a single-entity aggregate.
 - RegisterUserCommand is the typed Application input.
 - RegisterUser currently returns the Domain User to its sole HTTP adapter. The controller maps an explicit whitelist of response fields and never serializes the entity; add a Result DTO when another caller or independent output contract makes it useful.
-- Minimum password length is a registration input rule shared through one Command constant and enforced by both Form Request and Use Case. It is not a standalone Domain Policy while it is only a length check.
+- Identity password input is limited to 15–128 Unicode code points through shared Command constants, enforced by both Form Request and Use Case. Argon2id is the configured password-hashing algorithm and its availability is verified in Docker Build/CI; no composition rules or periodic password changes are imposed. A compromised/common-password blocklist remains a required production security item before public launch.
 - UserId is an opaque, non-empty identifier in Domain; ULID creation remains an Infrastructure concern.
-- UserRepository persists the aggregate. The database unique index is the authority for email uniqueness; the Eloquent adapter translates only that specific violation.
+- UserRepository persists the aggregate. A generated `email_normalized` column and named unique index enforce case-insensitive email identity in the database; the Eloquent adapter translates only that specific constraint violation.
 - The conventional App\\Models\\User is the Eloquent authentication/persistence model, separate from the Domain User. Its file location follows Laravel convention and does not change the dependency boundary.
 - There is one aggregate write during registration, so no generic transaction manager or Unit of Work is introduced.
 - No User lifecycle behavior (verification, suspension, recovery, password rotation) is invented before its rules are specified.
 
 Wallet and Trading must use the same dependency and boundary principles, but their aggregates must be discovered from their own invariants and business operations. Do not copy Identity's User shape or pre-create speculative aggregate classes.
 
-## 11. References
+## 11. Related contracts
+
+The DDD boundaries in this document are complemented by the operational rules in [Development Contracts](development-contracts.fa.md). The public registration request/response/error contract is defined in [Identity API v1](../../contracts/openapi/identity/identity-v1.yaml). Do not infer API or Event payloads from internal PHP classes.
+
+## 12. References
 
 1. Microsoft, [Use Tactical DDD to Design Microservices](https://learn.microsoft.com/en-us/azure/architecture/microservices/model/tactical-domain-driven-design) — entities, value objects, aggregate consistency boundaries, small aggregates, IDs and services.
 2. Microsoft, [Use Domain Analysis to Model Microservices](https://learn.microsoft.com/en-us/azure/architecture/microservices/model/domain-analysis) — bounded contexts, business capabilities, cohesion and ubiquitous language.

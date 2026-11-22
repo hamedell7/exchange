@@ -17,7 +17,7 @@ use Illuminate\Notifications\Notifiable;
  * Domain User aggregate.
  */
 #[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
+#[Hidden(['password', 'remember_token', 'email_normalized'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */

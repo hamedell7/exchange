@@ -8,21 +8,22 @@ use App\Modules\Identity\Application\Commands\RegisterUserCommand;
 use App\Modules\Identity\Application\Contracts\PasswordHasher;
 use App\Modules\Identity\Application\Contracts\UserIdGenerator;
 use App\Modules\Identity\Application\Contracts\UserRepository;
+use App\Modules\Identity\Application\Exceptions\InvalidRegistrationInput;
 use App\Modules\Identity\Application\UseCases\RegisterUser;
 use App\Modules\Identity\Domain\Entities\User;
 use App\Modules\Identity\Domain\ValueObjects\PasswordHash;
 use App\Modules\Identity\Domain\ValueObjects\UserId;
 use DateTimeImmutable;
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class RegisterUserTest extends TestCase
 {
     public function test_it_registers_a_user_from_a_command(): void
     {
+        $plainPassword = 'plain-password-long-enough';
         $userId = new UserId('01JCS7ZJ4M6P7W8X9Y0Z1A2B3C');
         $passwordHash = PasswordHash::fromEncodedHash(
-            password_hash('plain-password', PASSWORD_BCRYPT, ['cost' => 4]),
+            password_hash($plainPassword, PASSWORD_BCRYPT, ['cost' => 4]),
         );
 
         $users = $this->createMock(UserRepository::class);
@@ -41,7 +42,7 @@ final class RegisterUserTest extends TestCase
         $passwordHasher = $this->createMock(PasswordHasher::class);
         $passwordHasher->expects(self::once())
             ->method('hash')
-            ->with('plain-password')
+            ->with($plainPassword)
             ->willReturn($passwordHash);
 
         $userIds = $this->createMock(UserIdGenerator::class);
@@ -54,7 +55,7 @@ final class RegisterUserTest extends TestCase
         $user = $registerUser->execute(new RegisterUserCommand(
             name: '  Alice Example  ',
             email: ' Alice@example.com ',
-            plainPassword: 'plain-password',
+            plainPassword: $plainPassword,
         ));
 
         self::assertInstanceOf(User::class, $user);
@@ -78,12 +79,94 @@ final class RegisterUserTest extends TestCase
 
         $registerUser = new RegisterUser($users, $passwordHasher, $userIds);
 
-        $this->expectException(InvalidArgumentException::class);
+        try {
+            $registerUser->execute(new RegisterUserCommand(
+                name: 'Alice Example',
+                email: 'alice@example.com',
+                plainPassword: 'too-short',
+            ));
 
-        $registerUser->execute(new RegisterUserCommand(
-            name: 'Alice Example',
-            email: 'alice@example.com',
-            plainPassword: 'short',
-        ));
+            self::fail('A short password must be rejected.');
+        } catch (InvalidRegistrationInput $exception) {
+            self::assertSame('password', $exception->field);
+        }
+    }
+
+    public function test_it_rejects_a_password_over_the_limit_before_using_infrastructure(): void
+    {
+        $users = $this->createMock(UserRepository::class);
+        $users->expects(self::never())->method('save');
+
+        $passwordHasher = $this->createMock(PasswordHasher::class);
+        $passwordHasher->expects(self::never())->method('hash');
+
+        $userIds = $this->createMock(UserIdGenerator::class);
+        $userIds->expects(self::never())->method('generate');
+
+        $registerUser = new RegisterUser($users, $passwordHasher, $userIds);
+
+        try {
+            $registerUser->execute(new RegisterUserCommand(
+                name: 'Alice Example',
+                email: 'alice@example.com',
+                plainPassword: str_repeat('a', RegisterUserCommand::MAX_PASSWORD_LENGTH + 1),
+            ));
+
+            self::fail('An overlong password must be rejected.');
+        } catch (InvalidRegistrationInput $exception) {
+            self::assertSame('password', $exception->field);
+        }
+    }
+
+    public function test_it_rejects_an_invalid_email_before_using_infrastructure(): void
+    {
+        $users = $this->createMock(UserRepository::class);
+        $users->expects(self::never())->method('save');
+
+        $passwordHasher = $this->createMock(PasswordHasher::class);
+        $passwordHasher->expects(self::never())->method('hash');
+
+        $userIds = $this->createMock(UserIdGenerator::class);
+        $userIds->expects(self::never())->method('generate');
+
+        $registerUser = new RegisterUser($users, $passwordHasher, $userIds);
+
+        try {
+            $registerUser->execute(new RegisterUserCommand(
+                name: 'Alice Example',
+                email: 'not-an-email',
+                plainPassword: 'correct-horse-battery-staple',
+            ));
+
+            self::fail('An invalid email must be rejected.');
+        } catch (InvalidRegistrationInput $exception) {
+            self::assertSame('email', $exception->field);
+        }
+    }
+
+    public function test_it_rejects_a_name_longer_than_the_persistence_limit(): void
+    {
+        $users = $this->createMock(UserRepository::class);
+        $users->expects(self::never())->method('save');
+
+        $passwordHasher = $this->createMock(PasswordHasher::class);
+        $passwordHasher->expects(self::never())->method('hash');
+
+        $userIds = $this->createMock(UserIdGenerator::class);
+        $userIds->expects(self::never())->method('generate');
+
+        $registerUser = new RegisterUser($users, $passwordHasher, $userIds);
+
+        try {
+            $registerUser->execute(new RegisterUserCommand(
+                name: str_repeat('a', RegisterUserCommand::MAX_NAME_LENGTH + 1),
+                email: 'alice@example.com',
+                plainPassword: 'correct-horse-battery-staple',
+            ));
+
+            self::fail('An overlong name must be rejected.');
+        } catch (InvalidRegistrationInput $exception) {
+            self::assertSame('name', $exception->field);
+        }
     }
 }

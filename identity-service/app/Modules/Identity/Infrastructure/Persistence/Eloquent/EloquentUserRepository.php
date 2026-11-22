@@ -24,7 +24,7 @@ final class EloquentUserRepository implements UserRepository
                 'updated_at' => $user->registeredAt(),
             ])->save();
         } catch (QueryException $exception) {
-            if ($this->isEmailUniqueConstraintViolation($exception)) {
+            if ($this->isEmailIdentityUniqueViolation($exception)) {
                 throw EmailAlreadyRegistered::becauseEmailIsAlreadyRegistered($exception);
             }
 
@@ -32,19 +32,20 @@ final class EloquentUserRepository implements UserRepository
         }
     }
 
-    private function isEmailUniqueConstraintViolation(QueryException $exception): bool
+    private function isEmailIdentityUniqueViolation(QueryException $exception): bool
     {
         $sqlState = $exception->errorInfo[0] ?? null;
         $driverCode = (int) ($exception->errorInfo[1] ?? 0);
-        $message = strtolower($exception->getMessage());
+        $driverMessage = strtolower((string) ($exception->errorInfo[2] ?? ''));
 
         return match ($sqlState) {
-            '23505' => str_contains($message, 'users_email_unique'),
-            '23000' => match ($driverCode) {
-                19 => str_contains($message, 'unique constraint failed: users.email'),
-                1062 => str_contains($message, 'users_email_unique'),
-                default => false,
-            },
+            // PostgreSQL: unique violation on the generated identity key.
+            '23505' => str_contains($driverMessage, 'users_email_normalized_unique'),
+
+            // SQLite is used by the fast local test suite.
+            '23000' => in_array($driverCode, [19, 2067], true)
+                && str_contains($driverMessage, 'users.email_normalized'),
+
             default => false,
         };
     }

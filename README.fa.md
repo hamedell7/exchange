@@ -16,6 +16,14 @@ exchange/
     └── docs/                # معماری، ADRها و Runbookها
 ```
 
+## قراردادهای معماری و توسعه
+
+- [قراردادهای توسعه Exchange](platform/docs/architecture/development-contracts.fa.md)
+- [راهنمای DDD و مرزبندی لایه‌ها](platform/docs/architecture/domain-driven-design.md)
+- [قراردادهای عمومی API و Event](platform/contracts/README.fa.md)
+
+پیش از اضافه‌کردن الگوی جدید یا شروع یک Use Case در سرویس‌ها، این قراردادها مبنا هستند.
+
 ## مرزهای Docker در توسعه محلی
 
 - هر Laravel service با Compose مستقل اجرا می‌شود.

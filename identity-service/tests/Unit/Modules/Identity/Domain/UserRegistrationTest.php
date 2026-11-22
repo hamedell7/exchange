@@ -14,11 +14,14 @@ use PHPUnit\Framework\TestCase;
 
 final class UserRegistrationTest extends TestCase
 {
-    public function test_email_address_trims_input_and_normalizes_domain_only(): void
+    public function test_email_address_preserves_display_casing_and_compares_identity_case_insensitively(): void
     {
         $email = new EmailAddress('  Alice.Example@Example.COM  ');
+        $sameIdentity = new EmailAddress('alice.example@example.com');
 
         self::assertSame('Alice.Example@example.com', $email->value());
+        self::assertSame('alice.example@example.com', $email->normalizedForIdentity());
+        self::assertTrue($email->equals($sameIdentity));
     }
 
     public function test_invalid_email_address_is_rejected(): void
@@ -41,6 +44,10 @@ final class UserRegistrationTest extends TestCase
 
     public function test_password_hash_rejects_plain_text_and_accepts_encoded_hashes(): void
     {
+        $hash = PasswordHash::fromEncodedHash(password_hash('a test passphrase', PASSWORD_DEFAULT));
+
+        self::assertNotSame('', $hash->value());
+
         $this->expectException(InvalidArgumentException::class);
 
         PasswordHash::fromEncodedHash('plain-text-password');

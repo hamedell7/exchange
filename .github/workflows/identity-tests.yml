@@ -1,0 +1,89 @@
+name: Identity tests
+
+on:
+  push:
+    paths:
+      - "identity-service/**"
+      - "platform/contracts/openapi/identity/**"
+      - "platform/docs/architecture/**"
+      - ".github/workflows/identity-tests.yml"
+  pull_request:
+    paths:
+      - "identity-service/**"
+      - "platform/contracts/openapi/identity/**"
+      - "platform/docs/architecture/**"
+      - ".github/workflows/identity-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  identity-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, pgsql]
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: identity_test
+          POSTGRES_USER: identity
+          POSTGRES_PASSWORD: identity_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U identity -d identity_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: bcmath, intl, mbstring, pdo_pgsql, pdo_sqlite, zip
+          coverage: none
+
+      - name: Verify Argon2id support
+        run: php -r 'if (! defined("PASSWORD_ARGON2ID") || password_hash("exchange-ci-check", PASSWORD_ARGON2ID) === false) { fwrite(STDERR, "Argon2id support is required.\n"); exit(1); }'
+
+      - name: Prepare environment
+        working-directory: identity-service
+        run: cp .env.example .env
+
+      - name: Validate Composer configuration
+        working-directory: identity-service
+        run: composer validate --strict
+
+      - name: Install dependencies
+        working-directory: identity-service
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Generate application key
+        working-directory: identity-service
+        run: php artisan key:generate --force
+
+      - name: Run tests
+        working-directory: identity-service
+        env:
+          APP_ENV: testing
+          HASH_DRIVER: argon2id
+          DB_CONNECTION: ${{ matrix.database }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: ${{ matrix.database == 'pgsql' && 'identity_test' || ':memory:' }}
+          DB_USERNAME: identity
+          DB_PASSWORD: identity_test_password
+          DB_URL: ""
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+          QUEUE_CONNECTION: sync
+          MAIL_MAILER: array
+        run: php artisan test

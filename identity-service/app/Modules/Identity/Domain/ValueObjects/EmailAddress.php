@@ -6,15 +6,27 @@ namespace App\Modules\Identity\Domain\ValueObjects;
 
 use InvalidArgumentException;
 
+/**
+ * A deliverable email address.
+ *
+ * Original local-part casing is preserved for display and delivery.
+ * Identity comparison is case-insensitive.
+ */
 final readonly class EmailAddress
 {
+    public const MAX_LENGTH = 254;
+
     private string $value;
 
     public function __construct(string $value)
     {
         $candidate = trim($value);
 
-        if ($candidate === '' || filter_var($candidate, FILTER_VALIDATE_EMAIL) === false) {
+        if (
+            $candidate === ''
+            || strlen($candidate) > self::MAX_LENGTH
+            || filter_var($candidate, FILTER_VALIDATE_EMAIL) === false
+        ) {
             throw new InvalidArgumentException('The email address is invalid.');
         }
 
@@ -22,8 +34,6 @@ final readonly class EmailAddress
         $localPart = substr($candidate, 0, $separator);
         $domain = strtolower(substr($candidate, $separator + 1));
 
-        // The domain is case-insensitive. Preserve the local part because
-        // email standards do not guarantee that it is case-insensitive.
         $this->value = $localPart.'@'.$domain;
     }
 
@@ -32,9 +42,20 @@ final readonly class EmailAddress
         return $this->value;
     }
 
+    /**
+     * Canonical key for Identity account lookup and uniqueness.
+     *
+     * Exchange deliberately treats email account identifiers as
+     * case-insensitive, while preserving the original address for delivery.
+     */
+    public function normalizedForIdentity(): string
+    {
+        return strtolower($this->value);
+    }
+
     public function equals(self $other): bool
     {
-        return $this->value === $other->value;
+        return $this->normalizedForIdentity() === $other->normalizedForIdentity();
     }
 
     public function __toString(): string
