@@ -8,11 +8,10 @@ use App\Modules\Identity\Application\Commands\RegisterUserCommand;
 use App\Modules\Identity\Application\Contracts\PasswordHasher;
 use App\Modules\Identity\Application\Contracts\UserIdGenerator;
 use App\Modules\Identity\Application\Contracts\UserRepository;
-use App\Modules\Identity\Application\Results\RegisterUserResult;
 use App\Modules\Identity\Domain\Entities\User;
-use App\Modules\Identity\Domain\Policies\PasswordPolicy;
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
 use DateTimeImmutable;
+use InvalidArgumentException;
 
 final readonly class RegisterUser
 {
@@ -20,35 +19,32 @@ final readonly class RegisterUser
         private UserRepository $users,
         private PasswordHasher $passwordHasher,
         private UserIdGenerator $userIds,
-        private PasswordPolicy $passwordPolicy,
     ) {
     }
 
-    public function execute(RegisterUserCommand $command): RegisterUserResult
+    public function execute(RegisterUserCommand $command): User
     {
+        if (mb_strlen($command->plainPassword) < RegisterUserCommand::MIN_PASSWORD_LENGTH) {
+            throw new InvalidArgumentException(sprintf(
+                'A password must contain at least %d characters.',
+                RegisterUserCommand::MIN_PASSWORD_LENGTH,
+            ));
+        }
+
         $email = new EmailAddress($command->email);
-
-        $this->passwordPolicy->assertCompliant($command->plainPassword);
-
-        $registeredAt = new DateTimeImmutable();
 
         $user = User::register(
             $this->userIds->generate(),
             $command->name,
             $email,
             $this->passwordHasher->hash($command->plainPassword),
-            $registeredAt,
+            new DateTimeImmutable(),
         );
 
         // The database unique constraint is the final authority for email
         // uniqueness; a pre-check cannot protect against concurrent requests.
         $this->users->save($user);
 
-        return new RegisterUserResult(
-            id: $user->id()->value(),
-            name: $user->name(),
-            email: $user->email()->value(),
-            registeredAt: $user->registeredAt(),
-        );
+        return $user;
     }
 }

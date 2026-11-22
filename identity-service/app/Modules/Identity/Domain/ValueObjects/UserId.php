@@ -6,17 +6,20 @@ namespace App\Modules\Identity\Domain\ValueObjects;
 
 use InvalidArgumentException;
 
+/**
+ * Opaque identity identifier. Its generation and storage format are not
+ * business rules and therefore do not belong to the Domain.
+ */
 final readonly class UserId
 {
     private string $value;
 
     public function __construct(string $value)
     {
-        $value = strtoupper(trim($value));
+        $value = trim($value);
 
-        // ULID: 26 Crockford Base32 characters; the first character is 0-7.
-        if (preg_match('/\A[0-7][0-9A-HJKMNP-TV-Z]{25}\z/', $value) !== 1) {
-            throw new InvalidArgumentException('A valid ULID user identifier is required.');
+        if ($value === '') {
+            throw new InvalidArgumentException('A user identifier is required.');
         }
 
         $this->value = $value;

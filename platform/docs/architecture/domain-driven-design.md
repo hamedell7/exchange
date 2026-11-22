@@ -57,7 +57,7 @@ The preferred dependency direction is inward:
 ### Application
 
 - Implements use cases and coordinates work.
-- Contains typed, immutable command inputs and explicit result DTOs when crossing the use-case boundary.
+- Uses typed, immutable Commands for use-case inputs. Add a Result DTO only when separating the use-case output from its internal Domain model provides concrete value.
 - Depends on Domain types and ports (interfaces), not concrete infrastructure.
 - Orchestrates repositories, policies, clocks or other ports as needed.
 - Does not own business invariants or duplicate domain behavior.
@@ -84,7 +84,7 @@ A Command is the input contract for one use case.
 - Do not create a second DTO merely to wrap one Command or reduce its constructor to one argument.
 - Do not copy every database column into a Command. Include only data required by the operation.
 - Exclude transport-only fields such as password confirmation unless the use case itself genuinely needs them.
-- Return a Result DTO when the caller should not know about or depend on a Domain Entity.
+- Return a Result DTO when multiple callers or an independent output contract justify it. A single thin HTTP adapter may map selected fields from a Domain object, provided it never serializes or exposes internal state.
 - Do not add a mediator or command bus until dispatch, cross-cutting behaviors, or multiple transports provide a concrete benefit.
 
 ## 5. Aggregate design and consistency
@@ -143,11 +143,11 @@ The registration vertical slice follows these rules:
 
 - User is the Identity Domain Aggregate Root; currently it is a single-entity aggregate.
 - RegisterUserCommand is the typed Application input.
-- RegisterUserResult is the explicit output boundary; HTTP does not receive the Domain Entity.
-- PasswordPolicy protects the minimum password-length rule even when registration is invoked outside HTTP. Form Request validation mirrors it for early feedback.
-- UserId validates the ULID format required by the current persistence schema without depending on Laravel.
+- RegisterUser currently returns the Domain User to its sole HTTP adapter. The controller maps an explicit whitelist of response fields and never serializes the entity; add a Result DTO when another caller or independent output contract makes it useful.
+- Minimum password length is a registration input rule shared through one Command constant and enforced by both Form Request and Use Case. It is not a standalone Domain Policy while it is only a length check.
+- UserId is an opaque, non-empty identifier in Domain; ULID creation remains an Infrastructure concern.
 - UserRepository persists the aggregate. The database unique index is the authority for email uniqueness; the Eloquent adapter translates only that specific violation.
-- UserModel is an Eloquent authentication/persistence model inside Infrastructure, not the Domain User.
+- The conventional App\\Models\\User is the Eloquent authentication/persistence model, separate from the Domain User. Its file location follows Laravel convention and does not change the dependency boundary.
 - There is one aggregate write during registration, so no generic transaction manager or Unit of Work is introduced.
 - No User lifecycle behavior (verification, suspension, recovery, password rotation) is invented before its rules are specified.
 

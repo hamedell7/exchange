@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Modules\Identity\Infrastructure\Persistence\Eloquent\UserModel;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * @extends Factory<UserModel>
+ * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
-    protected $model = UserModel::class;
+    protected $model = User::class;
 
     protected static ?string $password;
 

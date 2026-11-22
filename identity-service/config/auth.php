@@ -1,6 +1,6 @@
 <?php
 
-use App\Modules\Identity\Infrastructure\Persistence\Eloquent\UserModel;
+use App\Models\User;
 
 return [
 
@@ -34,7 +34,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', UserModel::class),
+            'model' => env('AUTH_MODEL', User::class),
         ],
     ],
 

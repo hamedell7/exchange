@@ -9,7 +9,6 @@ use App\Http\Requests\Api\V1\Identity\RegisterUserRequest;
 use App\Modules\Identity\Application\Commands\RegisterUserCommand;
 use App\Modules\Identity\Application\Exceptions\EmailAlreadyRegistered;
 use App\Modules\Identity\Application\UseCases\RegisterUser;
-use App\Modules\Identity\Domain\Exceptions\WeakPassword;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 
@@ -22,7 +21,7 @@ final class RegistrationController extends Controller
         $validated = $request->validated();
 
         try {
-            $result = $registerUser->execute(
+            $user = $registerUser->execute(
                 new RegisterUserCommand(
                     name: $validated['name'],
                     email: $validated['email'],
@@ -33,18 +32,14 @@ final class RegistrationController extends Controller
             throw ValidationException::withMessages([
                 'email' => ['This email address is already registered.'],
             ]);
-        } catch (WeakPassword) {
-            throw ValidationException::withMessages([
-                'password' => ['The password must contain at least 12 characters.'],
-            ]);
         }
 
         return response()->json([
             'data' => [
-                'id' => $result->id,
-                'name' => $result->name,
-                'email' => $result->email,
-                'registered_at' => $result->registeredAt->format(DATE_ATOM),
+                'id' => $user->id()->value(),
+                'name' => $user->name(),
+                'email' => $user->email()->value(),
+                'registered_at' => $user->registeredAt()->format(DATE_ATOM),
             ],
         ], 201);
     }

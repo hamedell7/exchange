@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\Identity;
 
+use App\Modules\Identity\Application\Commands\RegisterUserCommand;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class RegisterUserRequest extends FormRequest
@@ -21,7 +22,12 @@ final class RegisterUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'min:2', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:12', 'confirmed'],
+            'password' => [
+                'required',
+                'string',
+                'min:'.RegisterUserCommand::MIN_PASSWORD_LENGTH,
+                'confirmed',
+            ],
         ];
     }
 

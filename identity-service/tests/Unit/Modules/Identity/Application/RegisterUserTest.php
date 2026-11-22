@@ -8,14 +8,12 @@ use App\Modules\Identity\Application\Commands\RegisterUserCommand;
 use App\Modules\Identity\Application\Contracts\PasswordHasher;
 use App\Modules\Identity\Application\Contracts\UserIdGenerator;
 use App\Modules\Identity\Application\Contracts\UserRepository;
-use App\Modules\Identity\Application\Results\RegisterUserResult;
 use App\Modules\Identity\Application\UseCases\RegisterUser;
-use App\Modules\Identity\Domain\Exceptions\WeakPassword;
-use App\Modules\Identity\Domain\Policies\PasswordPolicy;
 use App\Modules\Identity\Domain\Entities\User;
 use App\Modules\Identity\Domain\ValueObjects\PasswordHash;
 use App\Modules\Identity\Domain\ValueObjects\UserId;
 use DateTimeImmutable;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class RegisterUserTest extends TestCase
@@ -51,29 +49,23 @@ final class RegisterUserTest extends TestCase
             ->method('generate')
             ->willReturn($userId);
 
-        $registerUser = new RegisterUser(
-            $users,
-            $passwordHasher,
-            $userIds,
-            new PasswordPolicy(),
-        );
+        $registerUser = new RegisterUser($users, $passwordHasher, $userIds);
 
-        $result = $registerUser->execute(new RegisterUserCommand(
+        $user = $registerUser->execute(new RegisterUserCommand(
             name: '  Alice Example  ',
             email: ' Alice@example.com ',
             plainPassword: 'plain-password',
         ));
 
-        self::assertInstanceOf(RegisterUserResult::class, $result);
-        self::assertInstanceOf(User::class, $persistedUser);
-        self::assertSame($userId->value(), $result->id);
-        self::assertSame('Alice Example', $result->name);
-        self::assertSame('Alice@example.com', $result->email);
-        self::assertInstanceOf(DateTimeImmutable::class, $result->registeredAt);
+        self::assertInstanceOf(User::class, $user);
+        self::assertSame($userId->value(), $user->id()->value());
+        self::assertSame('Alice Example', $user->name());
+        self::assertSame('Alice@example.com', $user->email()->value());
+        self::assertInstanceOf(DateTimeImmutable::class, $user->registeredAt());
         self::assertSame($passwordHash, $persistedUser->passwordHash());
     }
 
-    public function test_it_rejects_a_weak_password_before_using_infrastructure(): void
+    public function test_it_rejects_a_short_password_before_using_infrastructure(): void
     {
         $users = $this->createMock(UserRepository::class);
         $users->expects(self::never())->method('save');
@@ -84,14 +76,9 @@ final class RegisterUserTest extends TestCase
         $userIds = $this->createMock(UserIdGenerator::class);
         $userIds->expects(self::never())->method('generate');
 
-        $registerUser = new RegisterUser(
-            $users,
-            $passwordHasher,
-            $userIds,
-            new PasswordPolicy(),
-        );
+        $registerUser = new RegisterUser($users, $passwordHasher, $userIds);
 
-        $this->expectException(WeakPassword::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $registerUser->execute(new RegisterUserCommand(
             name: 'Alice Example',
