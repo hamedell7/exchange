@@ -32,8 +32,8 @@ Route::prefix('v1/identity')->group(function (): void {
 
     Route::get('/users', ListUsersController::class)
         ->middleware([
-            RequireIdentityAdminReadToken::class,
             'throttle:60,1',
+            RequireIdentityAdminReadToken::class,
         ])
         ->name('identity.users.index');
 });

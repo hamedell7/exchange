@@ -39,7 +39,7 @@ Do not create speculative modules such as Sessions, MFA, or Credentials until th
 ## User-list API security
 
 - GET /api/v1/identity/users is a server-to-server read endpoint protected by X-Identity-Admin-Token.
-- Configure IDENTITY_USERS_READ_TOKEN with at least 64 random hexadecimal characters (32 random bytes).
+- Configure IDENTITY_USERS_READ_TOKEN as exactly 64 lowercase hexadecimal characters (32 random bytes).
 - The secret belongs in a backend Secret Store. Never place it in browser code, a frontend environment variable exposed to the browser, a public Postman environment, or a committed .env file.
 - The middleware fails closed when the secret is missing and compares the supplied value with hash_equals.
 - This shared machine credential is not per-user RBAC and does not replace the Gateway's eventual authentication/authorization contract.

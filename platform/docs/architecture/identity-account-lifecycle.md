@@ -47,7 +47,7 @@ Resend and forgot-password always return the same 202 response whether the email
 
 The user-list endpoint uses a dedicated Query, QueryHandler, and read projection. It supports optional search (name or email), status, page, and per_page (1–100; default 25). The response contains only id, name, email, status, email verification date, registration date, and pagination metadata.
 
-This is an administrative server-to-server endpoint protected by X-Identity-Admin-Token. Configure IDENTITY_USERS_READ_TOKEN with a random 32-byte hex secret (at least 64 characters). Keep it only in a backend Secret Store. It must not be embedded in browser code or a public Postman environment. This shared credential gates machine access; it is not a replacement for the future end-user/admin-role authorization contract.
+This is an administrative server-to-server endpoint protected by X-Identity-Admin-Token. Configure IDENTITY_USERS_READ_TOKEN with exactly 64 lowercase hexadecimal characters generated from 32 random bytes. Keep it only in a backend Secret Store. It must not be embedded in browser code or a public Postman environment. This shared credential gates machine access; it is not a replacement for the future end-user/admin-role authorization contract.
 
 ## Request validation and API Resources
 

@@ -17,7 +17,7 @@ final class RequireIdentityAdminReadToken
 
         // Fail closed: this endpoint must never become public because an
         // environment variable was omitted during deployment.
-        if (! is_string($expected) || strlen($expected) < 64) {
+        if (! is_string($expected) || preg_match('/\\A[a-f0-9]{64}\\z/D', $expected) !== 1) {
             return new JsonResponse([
                 'message' => 'The user-list endpoint is not configured for access.',
             ], 503);
