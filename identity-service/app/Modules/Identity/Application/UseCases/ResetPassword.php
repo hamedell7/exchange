@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Application\UseCases;
 
 use App\Modules\Identity\Application\Commands\ResetPasswordCommand;
-use App\Modules\Identity\Application\Commands\RegisterUserCommand;
 use App\Modules\Identity\Application\Contracts\AccountActionTokenRepository;
 use App\Modules\Identity\Application\Contracts\Clock;
 use App\Modules\Identity\Application\Contracts\PasswordHasher;
@@ -15,6 +14,8 @@ use App\Modules\Identity\Application\Enums\AccountAction;
 use App\Modules\Identity\Application\Exceptions\InvalidAccountActionToken;
 use App\Modules\Identity\Application\Exceptions\InvalidRegistrationInput;
 use App\Modules\Identity\Domain\Enums\UserStatus;
+use App\Modules\Identity\Domain\Policies\PasswordPolicy;
+use InvalidArgumentException;
 
 final readonly class ResetPassword
 {
@@ -29,20 +30,10 @@ final readonly class ResetPassword
 
     public function execute(ResetPasswordCommand $command): void
     {
-        $length = mb_strlen($command->plainPassword, 'UTF-8');
-
-        if ($length < RegisterUserCommand::MIN_PASSWORD_LENGTH) {
-            throw new InvalidRegistrationInput(
-                'password',
-                sprintf('The password must contain at least %d characters.', RegisterUserCommand::MIN_PASSWORD_LENGTH),
-            );
-        }
-
-        if ($length > RegisterUserCommand::MAX_PASSWORD_LENGTH) {
-            throw new InvalidRegistrationInput(
-                'password',
-                sprintf('The password may not exceed %d characters.', RegisterUserCommand::MAX_PASSWORD_LENGTH),
-            );
+        try {
+            PasswordPolicy::validate($command->plainPassword);
+        } catch (InvalidArgumentException $exception) {
+            throw new InvalidRegistrationInput('password', $exception->getMessage(), $exception);
         }
 
         $now = $this->clock->now();

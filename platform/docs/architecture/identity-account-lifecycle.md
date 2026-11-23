@@ -46,7 +46,7 @@ Resend and forgot-password always return the same 202 response whether the email
 
 Presentation owns transport validation. Each JSON Form Request declares its allow-list of fields and rejects unknown properties, matching the OpenAPI additionalProperties: false contract. Password confirmation is transport-only and never enters an Application Command.
 
-Application Commands remain immutable, typed PHP objects. The Use Case repeats critical password/email checks so it stays safe when called from a non-HTTP entry point.
+Application Commands remain immutable, typed PHP objects and carry no business-rule constants. The Domain User owns name validation, EmailAddress owns email syntax and identity normalization, and one Domain PasswordPolicy defines the password length rule shared by registration and password reset. Form Requests reuse Domain constants for early HTTP feedback; the Use Cases enforce the rules without depending on HTTP. No separate Password value object or custom policy exception is needed for this rule.
 
 Responses use an explicit Laravel JsonResource that maps the Domain User to an allow-listed public representation. The Domain aggregate and Eloquent model are never serialized directly. Passwords, password hashes, remember tokens, normalized lookup columns and action-token hashes are not part of the public resource.
 

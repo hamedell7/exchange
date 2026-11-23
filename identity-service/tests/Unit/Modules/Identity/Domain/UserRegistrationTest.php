@@ -6,6 +6,7 @@ namespace Tests\Unit\Modules\Identity\Domain;
 
 use App\Modules\Identity\Domain\Entities\User;
 use App\Modules\Identity\Domain\Enums\UserStatus;
+use App\Modules\Identity\Domain\Policies\PasswordPolicy;
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
 use App\Modules\Identity\Domain\ValueObjects\PasswordHash;
 use App\Modules\Identity\Domain\ValueObjects\UserId;
@@ -55,14 +56,61 @@ final class UserRegistrationTest extends TestCase
         PasswordHash::fromEncodedHash('plain-text-password');
     }
 
+    public function test_password_policy_accepts_minimum_and_maximum_unicode_lengths(): void
+    {
+        PasswordPolicy::validate(str_repeat('پ', PasswordPolicy::MIN_LENGTH));
+        PasswordPolicy::validate(str_repeat('پ', PasswordPolicy::MAX_LENGTH));
+
+    }
+
+    public function test_password_policy_rejects_too_short_passwords(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        PasswordPolicy::validate(str_repeat('پ', PasswordPolicy::MIN_LENGTH - 1));
+    }
+
+    public function test_password_policy_rejects_too_long_passwords(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        PasswordPolicy::validate(str_repeat('پ', PasswordPolicy::MAX_LENGTH + 1));
+    }
+
+    public function test_user_rejects_names_shorter_than_the_domain_minimum(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        User::register(
+            new UserId('user-123'),
+            'A',
+            new EmailAddress('alice@example.com'),
+            $this->passwordHash(),
+            new DateTimeImmutable('2026-11-21T09:00:00+00:00'),
+        );
+    }
+
+    public function test_user_rejects_names_longer_than_the_domain_maximum(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        User::register(
+            new UserId('user-123'),
+            str_repeat('A', User::MAX_NAME_LENGTH + 1),
+            new EmailAddress('alice@example.com'),
+            $this->passwordHash(),
+            new DateTimeImmutable('2026-11-21T09:00:00+00:00'),
+        );
+    }
+
     public function test_registration_creates_an_unverified_pending_account(): void
     {
         $registeredAt = new DateTimeImmutable('2026-11-21T09:00:00+03:30');
         $id = new UserId('user-123');
         $email = new EmailAddress('alice@example.com');
-        $passwordHash = PasswordHash::fromEncodedHash(password_hash('test-password', PASSWORD_DEFAULT));
+        $passwordHash = $this->passwordHash();
 
-        $user = User::register($id, 'Alice Example', $email, $passwordHash, $registeredAt);
+        $user = User::register($id, ' Alice Example ', $email, $passwordHash, $registeredAt);
 
         self::assertTrue($id->equals($user->id()));
         self::assertSame('Alice Example', $user->name());
@@ -111,8 +159,15 @@ final class UserRegistrationTest extends TestCase
             new UserId('user-123'),
             'Alice Example',
             new EmailAddress('alice@example.com'),
-            PasswordHash::fromEncodedHash(password_hash('test-password', PASSWORD_DEFAULT)),
+            $this->passwordHash(),
             new DateTimeImmutable('2026-11-21T09:00:00+00:00'),
+        );
+    }
+
+    private function passwordHash(): PasswordHash
+    {
+        return PasswordHash::fromEncodedHash(
+            password_hash('test-password-is-long-enough', PASSWORD_DEFAULT),
         );
     }
 }

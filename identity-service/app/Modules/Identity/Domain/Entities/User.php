@@ -19,6 +19,9 @@ use InvalidArgumentException;
  */
 final class User
 {
+    public const MIN_NAME_LENGTH = 2;
+    public const MAX_NAME_LENGTH = 255;
+
     private function __construct(
         private readonly UserId $id,
         private string $name,
@@ -38,9 +41,18 @@ final class User
         DateTimeImmutable $registeredAt,
     ): self {
         $name = trim($name);
+        $length = mb_strlen($name, 'UTF-8');
 
-        if ($name === '') {
-            throw new InvalidArgumentException('A user name is required.');
+        if ($length < self::MIN_NAME_LENGTH) {
+            throw new InvalidArgumentException(
+                sprintf('The name must contain at least %d characters.', self::MIN_NAME_LENGTH),
+            );
+        }
+
+        if ($length > self::MAX_NAME_LENGTH) {
+            throw new InvalidArgumentException(
+                sprintf('The name may not exceed %d characters.', self::MAX_NAME_LENGTH),
+            );
         }
 
         return new self(

@@ -17,6 +17,7 @@ use App\Modules\Identity\Application\Exceptions\InvalidRegistrationInput;
 use App\Modules\Identity\Application\UseCases\RegisterUser;
 use App\Modules\Identity\Domain\Entities\User;
 use App\Modules\Identity\Domain\Enums\UserStatus;
+use App\Modules\Identity\Domain\Policies\PasswordPolicy;
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
 use App\Modules\Identity\Domain\ValueObjects\PasswordHash;
 use App\Modules\Identity\Domain\ValueObjects\UserId;
@@ -119,7 +120,7 @@ final class RegisterUserTest extends TestCase
         }
     }
 
-    public function test_it_rejects_a_password_over_the_limit_before_using_infrastructure(): void
+    public function test_it_rejects_a_password_over_the_domain_limit_before_using_infrastructure(): void
     {
         [$registerUser, $users, $passwordHasher] = $this->makeUseCase();
 
@@ -130,7 +131,7 @@ final class RegisterUserTest extends TestCase
             $registerUser->execute(new RegisterUserCommand(
                 name: 'Alice Example',
                 email: 'alice@example.com',
-                plainPassword: str_repeat('a', RegisterUserCommand::MAX_PASSWORD_LENGTH + 1),
+                plainPassword: str_repeat('a', PasswordPolicy::MAX_LENGTH + 1),
             ));
 
             self::fail('An overlong password must be rejected.');
@@ -159,16 +160,40 @@ final class RegisterUserTest extends TestCase
         }
     }
 
-    public function test_it_rejects_a_name_longer_than_the_persistence_limit(): void
+    public function test_it_rejects_a_name_shorter_than_the_domain_minimum(): void
     {
         [$registerUser, $users, $passwordHasher] = $this->makeUseCase();
 
         $users->expects(self::never())->method('add');
-        $passwordHasher->expects(self::never())->method('hash');
+        $passwordHasher->method('hash')->willReturn(
+            PasswordHash::fromEncodedHash(password_hash('correct-horse-battery-staple', PASSWORD_BCRYPT, ['cost' => 4])),
+        );
 
         try {
             $registerUser->execute(new RegisterUserCommand(
-                name: str_repeat('a', RegisterUserCommand::MAX_NAME_LENGTH + 1),
+                name: 'A',
+                email: 'alice@example.com',
+                plainPassword: 'correct-horse-battery-staple',
+            ));
+
+            self::fail('A name shorter than the domain minimum must be rejected.');
+        } catch (InvalidRegistrationInput $exception) {
+            self::assertSame('name', $exception->field);
+        }
+    }
+
+    public function test_it_rejects_a_name_longer_than_the_domain_maximum(): void
+    {
+        [$registerUser, $users, $passwordHasher] = $this->makeUseCase();
+
+        $users->expects(self::never())->method('add');
+        $passwordHasher->method('hash')->willReturn(
+            PasswordHash::fromEncodedHash(password_hash('correct-horse-battery-staple', PASSWORD_BCRYPT, ['cost' => 4])),
+        );
+
+        try {
+            $registerUser->execute(new RegisterUserCommand(
+                name: str_repeat('a', User::MAX_NAME_LENGTH + 1),
                 email: 'alice@example.com',
                 plainPassword: 'correct-horse-battery-staple',
             ));

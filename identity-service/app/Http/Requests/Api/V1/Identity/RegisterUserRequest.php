@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\Identity;
 
-use App\Modules\Identity\Application\Commands\RegisterUserCommand;
+use App\Modules\Identity\Domain\Entities\User;
+use App\Modules\Identity\Domain\Policies\PasswordPolicy;
 
 final class RegisterUserRequest extends StrictIdentityRequest
 {
@@ -18,23 +19,23 @@ final class RegisterUserRequest extends StrictIdentityRequest
                 'bail',
                 'required',
                 'string',
-                'min:'.RegisterUserCommand::MIN_NAME_LENGTH,
-                'max:'.RegisterUserCommand::MAX_NAME_LENGTH,
+                'min:'.User::MIN_NAME_LENGTH,
+                'max:'.User::MAX_NAME_LENGTH,
             ],
             'email' => $this->emailAddressRules(),
             'password' => [
                 'bail',
                 'required',
                 'string',
-                'min:'.RegisterUserCommand::MIN_PASSWORD_LENGTH,
-                'max:'.RegisterUserCommand::MAX_PASSWORD_LENGTH,
+                'min:'.PasswordPolicy::MIN_LENGTH,
+                'max:'.PasswordPolicy::MAX_LENGTH,
                 'confirmed',
             ],
             'password_confirmation' => [
                 'required',
                 'string',
-                'min:'.RegisterUserCommand::MIN_PASSWORD_LENGTH,
-                'max:'.RegisterUserCommand::MAX_PASSWORD_LENGTH,
+                'min:'.PasswordPolicy::MIN_LENGTH,
+                'max:'.PasswordPolicy::MAX_LENGTH,
             ],
         ];
     }

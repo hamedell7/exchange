@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\Identity;
 
-use App\Modules\Identity\Application\Commands\RegisterUserCommand;
+use App\Modules\Identity\Domain\Policies\PasswordPolicy;
 
 final class ResetPasswordRequest extends StrictIdentityRequest
 {
@@ -16,15 +16,15 @@ final class ResetPasswordRequest extends StrictIdentityRequest
                 'bail',
                 'required',
                 'string',
-                'min:'.RegisterUserCommand::MIN_PASSWORD_LENGTH,
-                'max:'.RegisterUserCommand::MAX_PASSWORD_LENGTH,
+                'min:'.PasswordPolicy::MIN_LENGTH,
+                'max:'.PasswordPolicy::MAX_LENGTH,
                 'confirmed',
             ],
             'password_confirmation' => [
                 'required',
                 'string',
-                'min:'.RegisterUserCommand::MIN_PASSWORD_LENGTH,
-                'max:'.RegisterUserCommand::MAX_PASSWORD_LENGTH,
+                'min:'.PasswordPolicy::MIN_LENGTH,
+                'max:'.PasswordPolicy::MAX_LENGTH,
             ],
         ];
     }

@@ -16,6 +16,7 @@ use App\Modules\Identity\Application\Contracts\UserRepository;
 use App\Modules\Identity\Application\Enums\AccountAction;
 use App\Modules\Identity\Application\Exceptions\InvalidRegistrationInput;
 use App\Modules\Identity\Domain\Entities\User;
+use App\Modules\Identity\Domain\Policies\PasswordPolicy;
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
 use InvalidArgumentException;
 
@@ -38,37 +39,10 @@ final readonly class RegisterUser
      */
     public function execute(RegisterUserCommand $command): User
     {
-        $name = trim($command->name);
-        $nameLength = mb_strlen($name, 'UTF-8');
-
-        if ($nameLength < RegisterUserCommand::MIN_NAME_LENGTH) {
-            throw new InvalidRegistrationInput(
-                'name',
-                sprintf('The name must contain at least %d characters.', RegisterUserCommand::MIN_NAME_LENGTH),
-            );
-        }
-
-        if ($nameLength > RegisterUserCommand::MAX_NAME_LENGTH) {
-            throw new InvalidRegistrationInput(
-                'name',
-                sprintf('The name may not exceed %d characters.', RegisterUserCommand::MAX_NAME_LENGTH),
-            );
-        }
-
-        $passwordLength = mb_strlen($command->plainPassword, 'UTF-8');
-
-        if ($passwordLength < RegisterUserCommand::MIN_PASSWORD_LENGTH) {
-            throw new InvalidRegistrationInput(
-                'password',
-                sprintf('The password must contain at least %d characters.', RegisterUserCommand::MIN_PASSWORD_LENGTH),
-            );
-        }
-
-        if ($passwordLength > RegisterUserCommand::MAX_PASSWORD_LENGTH) {
-            throw new InvalidRegistrationInput(
-                'password',
-                sprintf('The password may not exceed %d characters.', RegisterUserCommand::MAX_PASSWORD_LENGTH),
-            );
+        try {
+            PasswordPolicy::validate($command->plainPassword);
+        } catch (InvalidArgumentException $exception) {
+            throw new InvalidRegistrationInput('password', $exception->getMessage(), $exception);
         }
 
         try {
@@ -82,13 +56,21 @@ final readonly class RegisterUser
         }
 
         $now = $this->clock->now();
-        $user = User::register(
-            $this->userIds->generate(),
-            $name,
-            $email,
-            $this->passwordHasher->hash($command->plainPassword),
-            $now,
-        );
+        $userId = $this->userIds->generate();
+        $passwordHash = $this->passwordHasher->hash($command->plainPassword);
+
+        try {
+            $user = User::register(
+                $userId,
+                $command->name,
+                $email,
+                $passwordHash,
+                $now,
+            );
+        } catch (InvalidArgumentException $exception) {
+            throw new InvalidRegistrationInput('name', $exception->getMessage(), $exception);
+        }
+
         $plainToken = $this->tokenGenerator->generate();
 
         $this->transactions->run(function () use ($user, $plainToken, $now): void {
