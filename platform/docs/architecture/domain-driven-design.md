@@ -72,7 +72,7 @@ The preferred dependency direction is inward:
 
 ### Presentation
 
-Controllers, Form Requests, API Resources and Console commands are delivery adapters. They translate transport input into Application Commands and translate Application Results or known failures into transport responses.
+Controllers, Form Requests, API Resources and Console commands are delivery adapters. They translate transport input into Application Commands and translate Application Results or known failures into transport responses. Form Requests own HTTP shape, allow-listed input fields and transport validation; API Resources own the explicit public response representation. Neither belongs in Domain or Application.
 
 ## 4. Commands and results
 
@@ -120,7 +120,12 @@ Use a transaction when a use case performs multiple writes that must commit or r
 
 ## 8. Validation and error mapping
 
-- Form Requests validate transport concerns and provide useful HTTP feedback.
+- Form Requests validate transport concerns, reject fields outside the API contract, and provide useful HTTP feedback.
+- Domain invariants must also be enforced when a use case is called outside HTTP.
+- Application errors describe use-case outcomes; Domain exceptions describe violated domain rules.
+- Infrastructure translates technology-specific failures into stable inward-facing errors.
+- Controllers map known Application/Domain failures to HTTP status codes. Domain and Application code must not throw Laravel HTTP exceptions.
+- API Resources or explicit response DTOs whitelist fields exposed to clients. Never serialize Domain aggregates or Eloquent models directly.
 - Domain invariants must also be enforced when a use case is called outside HTTP.
 - Application errors describe use-case outcomes; Domain exceptions describe violated domain rules.
 - Infrastructure translates technology-specific failures into stable inward-facing errors.
@@ -143,13 +148,15 @@ The registration vertical slice follows these rules:
 
 - User is the Identity Domain Aggregate Root; currently it is a single-entity aggregate.
 - RegisterUserCommand is the typed Application input.
-- RegisterUser currently returns the Domain User to its sole HTTP adapter. The controller maps an explicit whitelist of response fields and never serializes the entity; add a Result DTO when another caller or independent output contract makes it useful.
+- RegisterUser returns the Domain User to its HTTP adapter, which maps it through an explicit UserResource whitelist and never serializes the entity; add a Result DTO when another caller or independent output contract makes it useful.
 - Identity password input is limited to 15–128 Unicode code points through shared Command constants, enforced by both Form Request and Use Case. Argon2id is the configured password-hashing algorithm and its availability is verified in Docker Build/CI; no composition rules or periodic password changes are imposed. A compromised/common-password blocklist remains a required production security item before public launch.
 - UserId is an opaque, non-empty identifier in Domain; ULID creation remains an Infrastructure concern.
 - UserRepository persists the aggregate. A generated `email_normalized` column and named unique index enforce case-insensitive email identity in the database; the Eloquent adapter translates only that specific constraint violation.
 - The conventional App\\Models\\User is the Eloquent authentication/persistence model, separate from the Domain User. Its file location follows Laravel convention and does not change the dependency boundary.
-- There is one aggregate write during registration, so no generic transaction manager or Unit of Work is introduced.
-- No User lifecycle behavior (verification, suspension, recovery, password rotation) is invented before its rules are specified.
+- Registration, verification, resend and password-reset use immutable Application Commands. HTTP Form Requests reject unknown JSON fields, keep password confirmation outside Application, and map through an explicit `UserResource` whitelist.
+- User lifecycle states are `pending_verification`, `active`, `suspended` and `closed`; transitions are enforced in the aggregate. Registration creates a pending account. Verification and password reset use purpose-scoped, expiring, single-use tokens whose SHA-256 hashes are stored and whose consumption is atomic with the aggregate update.
+- A transaction port is used only for concrete multi-write operations that must remain atomic (account + verification token, or token consumption + account update), not as a generic Unit of Work for each persistence call.
+- Login, MFA, refresh tokens, revocable security sessions and administrative lifecycle endpoints remain deferred until Gateway authentication and administrative authorization contracts are defined. See [Identity Account Lifecycle](identity-account-lifecycle.md).
 
 Wallet and Trading must use the same dependency and boundary principles, but their aggregates must be discovered from their own invariants and business operations. Do not copy Identity's User shape or pre-create speculative aggregate classes.
 

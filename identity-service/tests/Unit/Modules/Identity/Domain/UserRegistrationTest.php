@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Unit\Modules\Identity\Domain;
 
 use App\Modules\Identity\Domain\Entities\User;
+use App\Modules\Identity\Domain\Enums\UserStatus;
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
 use App\Modules\Identity\Domain\ValueObjects\PasswordHash;
 use App\Modules\Identity\Domain\ValueObjects\UserId;
 use DateTimeImmutable;
+use DomainException;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
@@ -53,14 +55,12 @@ final class UserRegistrationTest extends TestCase
         PasswordHash::fromEncodedHash('plain-text-password');
     }
 
-    public function test_user_aggregate_can_be_created_with_valid_registration_data(): void
+    public function test_registration_creates_an_unverified_pending_account(): void
     {
         $registeredAt = new DateTimeImmutable('2026-11-21T09:00:00+03:30');
         $id = new UserId('user-123');
         $email = new EmailAddress('alice@example.com');
-        $passwordHash = PasswordHash::fromEncodedHash(
-            password_hash('test-password', PASSWORD_DEFAULT),
-        );
+        $passwordHash = PasswordHash::fromEncodedHash(password_hash('test-password', PASSWORD_DEFAULT));
 
         $user = User::register($id, 'Alice Example', $email, $passwordHash, $registeredAt);
 
@@ -69,5 +69,50 @@ final class UserRegistrationTest extends TestCase
         self::assertTrue($email->equals($user->email()));
         self::assertSame($passwordHash, $user->passwordHash());
         self::assertSame($registeredAt, $user->registeredAt());
+        self::assertSame(UserStatus::PendingVerification, $user->status());
+        self::assertNull($user->emailVerifiedAt());
+    }
+
+    public function test_verifying_email_activates_the_account_once(): void
+    {
+        $user = $this->pendingUser();
+        $verifiedAt = new DateTimeImmutable('2026-11-23T10:00:00+00:00');
+
+        $user->verifyEmail($verifiedAt);
+
+        self::assertSame(UserStatus::Active, $user->status());
+        self::assertSame($verifiedAt, $user->emailVerifiedAt());
+
+        $this->expectException(DomainException::class);
+        $user->verifyEmail($verifiedAt);
+    }
+
+    public function test_suspend_reinstate_and_close_follow_allowed_transitions(): void
+    {
+        $user = $this->pendingUser();
+        $user->verifyEmail(new DateTimeImmutable('2026-11-23T10:00:00+00:00'));
+
+        $user->suspend();
+        self::assertSame(UserStatus::Suspended, $user->status());
+
+        $user->reinstate();
+        self::assertSame(UserStatus::Active, $user->status());
+
+        $user->close();
+        self::assertSame(UserStatus::Closed, $user->status());
+
+        $this->expectException(DomainException::class);
+        $user->reinstate();
+    }
+
+    private function pendingUser(): User
+    {
+        return User::register(
+            new UserId('user-123'),
+            'Alice Example',
+            new EmailAddress('alice@example.com'),
+            PasswordHash::fromEncodedHash(password_hash('test-password', PASSWORD_DEFAULT)),
+            new DateTimeImmutable('2026-11-21T09:00:00+00:00'),
+        );
     }
 }

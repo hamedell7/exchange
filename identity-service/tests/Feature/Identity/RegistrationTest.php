@@ -10,11 +10,19 @@ use App\Modules\Identity\Domain\ValueObjects\UserId;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 final class RegistrationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Mail::fake();
+    }
 
     public function test_user_can_register_through_the_identity_api(): void
     {
@@ -29,11 +37,17 @@ final class RegistrationTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.name', 'Alice Example')
             ->assertJsonPath('data.email', 'Alice@example.com')
-            ->assertJsonStructure(['data' => ['id', 'name', 'email', 'registered_at']]);
+            ->assertJsonPath('data.status', 'pending_verification')
+            ->assertJsonPath('data.email_verified_at', null)
+            ->assertJsonStructure(['data' => [
+                'id', 'name', 'email', 'status', 'email_verified_at', 'registered_at',
+            ]]);
 
         $this->assertDatabaseHas('users', [
             'email' => 'Alice@example.com',
             'email_normalized' => 'alice@example.com',
+            'status' => 'pending_verification',
+            'email_verified_at' => null,
         ]);
 
         $user = User::query()->where('email', 'Alice@example.com')->firstOrFail();
@@ -43,6 +57,7 @@ final class RegistrationTest extends TestCase
         self::assertSame(26, strlen($user->id));
         self::assertArrayNotHasKey('password', $response->json('data'));
         self::assertArrayNotHasKey('email_normalized', $user->toArray());
+        Mail::assertSent(\App\Modules\Identity\Infrastructure\Mail\EmailVerificationMail::class);
     }
 
     public function test_email_identity_is_case_insensitive_and_duplicate_returns_conflict(): void
@@ -128,5 +143,18 @@ final class RegistrationTest extends TestCase
             'password' => 'correct-horse-battery-staple',
             'password_confirmation' => 'correct-horse-battery-staple',
         ])->assertUnprocessable()->assertJsonValidationErrors('email');
+    }
+
+    public function test_registration_rejects_unrecognized_fields(): void
+    {
+        $this->postJson('/api/v1/identity/register', [
+            'name' => 'Alice Example',
+            'email' => 'alice@example.com',
+            'password' => 'correct-horse-battery-staple',
+            'password_confirmation' => 'correct-horse-battery-staple',
+            'is_admin' => true,
+        ])->assertUnprocessable()->assertJsonValidationErrors('is_admin');
+
+        $this->assertDatabaseCount('users', 0);
     }
 }

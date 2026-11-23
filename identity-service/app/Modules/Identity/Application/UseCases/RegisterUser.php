@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Application\UseCases;
 
 use App\Modules\Identity\Application\Commands\RegisterUserCommand;
+use App\Modules\Identity\Application\Contracts\AccountActionTokenRepository;
+use App\Modules\Identity\Application\Contracts\Clock;
+use App\Modules\Identity\Application\Contracts\IdentityMailer;
 use App\Modules\Identity\Application\Contracts\PasswordHasher;
+use App\Modules\Identity\Application\Contracts\TokenGenerator;
+use App\Modules\Identity\Application\Contracts\TransactionRunner;
 use App\Modules\Identity\Application\Contracts\UserIdGenerator;
 use App\Modules\Identity\Application\Contracts\UserRepository;
-use App\Modules\Identity\Application\Exceptions\EmailAlreadyRegistered;
+use App\Modules\Identity\Application\Enums\AccountAction;
 use App\Modules\Identity\Application\Exceptions\InvalidRegistrationInput;
 use App\Modules\Identity\Domain\Entities\User;
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
-use DateTimeImmutable;
 use InvalidArgumentException;
 
 final readonly class RegisterUser
@@ -21,12 +25,16 @@ final readonly class RegisterUser
         private UserRepository $users,
         private PasswordHasher $passwordHasher,
         private UserIdGenerator $userIds,
+        private AccountActionTokenRepository $tokens,
+        private TokenGenerator $tokenGenerator,
+        private IdentityMailer $mailer,
+        private Clock $clock,
+        private TransactionRunner $transactions,
     ) {
     }
 
     /**
      * @throws InvalidRegistrationInput When a registration field is invalid.
-     * @throws EmailAlreadyRegistered When the normalized email identity is already in use.
      */
     public function execute(RegisterUserCommand $command): User
     {
@@ -73,17 +81,30 @@ final readonly class RegisterUser
             );
         }
 
+        $now = $this->clock->now();
         $user = User::register(
             $this->userIds->generate(),
             $name,
             $email,
             $this->passwordHasher->hash($command->plainPassword),
-            new DateTimeImmutable(),
+            $now,
         );
+        $plainToken = $this->tokenGenerator->generate();
 
-        // The database unique constraint is the final authority for email
-        // identity uniqueness; a pre-check cannot protect against races.
-        $this->users->save($user);
+        $this->transactions->run(function () use ($user, $plainToken, $now): void {
+            $this->users->add($user);
+            $this->tokens->issue(
+                $user->id(),
+                AccountAction::VerifyEmail,
+                hash('sha256', $plainToken),
+                $now->modify('+60 minutes'),
+                $now,
+            );
+        });
+
+        // Email is sent only after the account and its one-time token commit.
+        // A mail transport failure is recoverable through the resend endpoint.
+        $this->mailer->sendEmailVerification($email, $plainToken);
 
         return $user;
     }

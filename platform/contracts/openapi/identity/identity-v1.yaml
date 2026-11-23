@@ -5,6 +5,7 @@ info:
   description: |
     Public HTTP contract for Identity service version 1.
     Email casing is preserved in the stored/display address, while account identity is case-insensitive.
+    New registrations remain pending until their email address is verified.
     Passwords are 15 to 128 Unicode code points and are hashed with Argon2id.
 servers:
   - url: http://localhost:8080
@@ -18,7 +19,8 @@ paths:
       operationId: registerIdentityUser
       summary: Register a new Identity account
       description: |
-        Public registration endpoint. Rate limited to 10 requests per minute per caller.
+        Creates a pending account and attempts to deliver a single-use email-verification link.
+        Rate limited to 10 requests per minute per caller.
         Email addresses that differ only by letter casing represent the same account identity.
       security: []
       requestBody:
@@ -34,22 +36,17 @@ paths:
               password_confirmation: correct-horse-battery-staple
       responses:
         '201':
-          description: Account created
+          description: Pending account created; verification email delivery attempted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegisterUserResponse'
+                $ref: '#/components/schemas/UserResourceResponse'
         '409':
           description: An account with the same normalized email identity already exists
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/FieldConflict'
-              example:
-                message: The email address is already registered.
-                errors:
-                  email:
-                    - The email address is already registered.
         '422':
           description: Request fields failed validation
           content:
@@ -57,24 +54,145 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationError'
         '429':
-          description: Request rate limit exceeded
-          headers:
-            Retry-After:
-              description: Seconds until another request may be attempted
-              schema:
-                type: integer
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericError'
+          $ref: '#/components/responses/RateLimited'
         '500':
-          description: Unexpected server error. Internal details are never returned in production.
+          $ref: '#/components/responses/UnexpectedError'
+
+  /api/v1/identity/email/verification/verify:
+    post:
+      tags: [Identity]
+      operationId: verifyIdentityEmail
+      summary: Verify an email address
+      description: Consumes a single-use verification token and activates the pending account.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
+      responses:
+        '200':
+          description: Email verified and account activated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GenericError'
+                $ref: '#/components/schemas/UserResourceResponse'
+        '422':
+          description: Token is invalid, expired, already consumed, or no longer applicable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/v1/identity/email/verification/resend:
+    post:
+      tags: [Identity]
+      operationId: resendIdentityEmailVerification
+      summary: Request another email-verification link
+      description: Always returns the same response for unknown, active, or pending accounts to prevent account enumeration.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailAddressRequest'
+      responses:
+        '202':
+          description: Request accepted; a verification email may be sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+        '422':
+          description: Request fields failed validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/v1/identity/password/forgot:
+    post:
+      tags: [Identity]
+      operationId: requestIdentityPasswordReset
+      summary: Request a password-reset link
+      description: Always returns the same response for unknown or known accounts to prevent account enumeration.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailAddressRequest'
+      responses:
+        '202':
+          description: Request accepted; a reset email may be sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+        '422':
+          description: Request fields failed validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/v1/identity/password/reset:
+    post:
+      tags: [Identity]
+      operationId: resetIdentityPassword
+      summary: Reset a password using a single-use token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+        '422':
+          description: Request failed validation or token is no longer valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
 components:
+  responses:
+    RateLimited:
+      description: Request rate limit exceeded
+      headers:
+        Retry-After:
+          description: Seconds until another request may be attempted
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericError'
+    UnexpectedError:
+      description: Unexpected server error. Internal details are never returned in production.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericError'
+
   schemas:
     RegisterUserRequest:
       type: object
@@ -98,29 +216,78 @@ components:
           type: string
           minLength: 15
           maxLength: 128
-    RegisterUserResponse:
+    EmailAddressRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+    VerifyEmailRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          description: Single-use, 256-bit random token; only its SHA-256 hash is stored.
+    ResetPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [token, password, password_confirmation]
+      properties:
+        token:
+          type: string
+          pattern: '^[a-fA-F0-9]{64}$'
+          description: Single-use, 256-bit random token; only its SHA-256 hash is stored.
+        password:
+          type: string
+          minLength: 15
+          maxLength: 128
+        password_confirmation:
+          type: string
+          minLength: 15
+          maxLength: 128
+    UserResourceResponse:
       type: object
       additionalProperties: false
       required: [data]
       properties:
         data:
-          type: object
-          additionalProperties: false
-          required: [id, name, email, registered_at]
-          properties:
-            id:
-              type: string
-              pattern: '^[0-7][0-9A-HJKMNP-TV-Z]{25}$'
-              description: ULID generated by the Identity service.
-            name:
-              type: string
-            email:
-              type: string
-              format: email
-              description: Original local-part casing is preserved; domain is stored lowercase.
-            registered_at:
-              type: string
-              format: date-time
+          $ref: '#/components/schemas/UserResource'
+    UserResource:
+      type: object
+      additionalProperties: false
+      required: [id, name, email, status, email_verified_at, registered_at]
+      properties:
+        id:
+          type: string
+          pattern: '^[0-7][0-9A-HJKMNP-TV-Z]{25}$'
+          description: ULID generated by the Identity service.
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+          description: Original local-part casing is preserved; domain is stored lowercase.
+        status:
+          type: string
+          enum: [pending_verification, active, suspended, closed]
+        email_verified_at:
+          type: [string, 'null']
+          format: date-time
+        registered_at:
+          type: string
+          format: date-time
+    GenericMessage:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
     ValidationError:
       type: object
       required: [message, errors]
