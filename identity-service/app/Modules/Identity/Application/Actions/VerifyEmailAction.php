@@ -8,6 +8,7 @@ use App\Modules\Identity\Application\Commands\VerifyEmailCommand;
 use App\Modules\Identity\Application\Contracts\AccountActionTokenRepository;
 use App\Modules\Identity\Application\Contracts\Clock;
 use App\Modules\Identity\Application\Contracts\TransactionRunner;
+use App\Modules\Identity\Application\Contracts\UserReader;
 use App\Modules\Identity\Application\Contracts\UserRepository;
 use App\Modules\Identity\Application\Enums\AccountAction;
 use App\Modules\Identity\Application\Exceptions\InvalidAccountActionToken;
@@ -18,6 +19,7 @@ final readonly class VerifyEmailAction
 {
     public function __construct(
         private AccountActionTokenRepository $tokens,
+        private UserReader $userReader,
         private UserRepository $users,
         private Clock $clock,
         private TransactionRunner $transactions,
@@ -39,7 +41,7 @@ final readonly class VerifyEmailAction
                 throw InvalidAccountActionToken::expiredOrInvalid();
             }
 
-            $user = $this->users->findById($userId);
+            $user = $this->userReader->findById($userId);
 
             if ($user === null || $user->status() !== UserStatus::PendingVerification) {
                 throw InvalidAccountActionToken::expiredOrInvalid();
