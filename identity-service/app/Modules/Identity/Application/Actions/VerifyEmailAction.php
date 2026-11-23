@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Identity\Application\UseCases;
+namespace App\Modules\Identity\Application\Actions;
 
 use App\Modules\Identity\Application\Commands\VerifyEmailCommand;
 use App\Modules\Identity\Application\Contracts\AccountActionTokenRepository;
@@ -14,7 +14,7 @@ use App\Modules\Identity\Application\Exceptions\InvalidAccountActionToken;
 use App\Modules\Identity\Domain\Enums\UserStatus;
 use App\Modules\Identity\Domain\Entities\User;
 
-final readonly class VerifyEmail
+final readonly class VerifyEmailAction
 {
     public function __construct(
         private AccountActionTokenRepository $tokens,

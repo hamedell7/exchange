@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Identity\Application\UseCases;
+namespace App\Modules\Identity\Application\Actions;
 
 use App\Modules\Identity\Application\Commands\RegisterUserCommand;
 use App\Modules\Identity\Application\Contracts\AccountActionTokenRepository;
@@ -20,7 +20,7 @@ use App\Modules\Identity\Domain\Policies\PasswordPolicy;
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
 use InvalidArgumentException;
 
-final readonly class RegisterUser
+final readonly class RegisterUserAction
 {
     public function __construct(
         private UserRepository $users,

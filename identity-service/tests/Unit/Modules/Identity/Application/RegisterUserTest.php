@@ -14,7 +14,7 @@ use App\Modules\Identity\Application\Contracts\TransactionRunner;
 use App\Modules\Identity\Application\Contracts\UserIdGenerator;
 use App\Modules\Identity\Application\Contracts\UserRepository;
 use App\Modules\Identity\Application\Exceptions\InvalidRegistrationInput;
-use App\Modules\Identity\Application\UseCases\RegisterUser;
+use App\Modules\Identity\Application\Actions\RegisterUserAction;
 use App\Modules\Identity\Domain\Entities\User;
 use App\Modules\Identity\Domain\Enums\UserStatus;
 use App\Modules\Identity\Domain\Policies\PasswordPolicy;
@@ -71,7 +71,7 @@ final class RegisterUserTest extends TestCase
         $transactions = $this->createMock(TransactionRunner::class);
         $transactions->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
 
-        $registerUser = new RegisterUser(
+        $registerUser = new RegisterUserAction(
             $users,
             $passwordHasher,
             $userIds,
@@ -205,7 +205,7 @@ final class RegisterUserTest extends TestCase
     }
 
     /**
-     * @return array{RegisterUser, UserRepository&\PHPUnit\Framework\MockObject\MockObject, PasswordHasher&\PHPUnit\Framework\MockObject\MockObject, AccountActionTokenRepository&\PHPUnit\Framework\MockObject\MockObject, IdentityMailer&\PHPUnit\Framework\MockObject\MockObject}
+     * @return array{RegisterUserAction, UserRepository&\PHPUnit\Framework\MockObject\MockObject, PasswordHasher&\PHPUnit\Framework\MockObject\MockObject, AccountActionTokenRepository&\PHPUnit\Framework\MockObject\MockObject, IdentityMailer&\PHPUnit\Framework\MockObject\MockObject}
      */
     private function makeUseCase(): array
     {
@@ -223,7 +223,7 @@ final class RegisterUserTest extends TestCase
         $userIds->method('generate')->willReturn(new UserId('01JCS7ZJ4M6P7W8X9Y0Z1A2B3C'));
 
         return [
-            new RegisterUser($users, $passwordHasher, $userIds, $tokens, $tokenGenerator, $mailer, $clock, $transactions),
+            new RegisterUserAction($users, $passwordHasher, $userIds, $tokens, $tokenGenerator, $mailer, $clock, $transactions),
             $users,
             $passwordHasher,
             $tokens,

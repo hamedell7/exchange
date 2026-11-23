@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\V1\Identity;
+namespace App\Modules\Identity\Presentation\Http\Controllers\Api\V1\Identity;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Identity\ForgotPasswordRequest;
-use App\Http\Requests\Api\V1\Identity\ResetPasswordRequest;
+use App\Modules\Identity\Presentation\Http\Requests\Api\V1\Identity\ForgotPasswordRequest;
+use App\Modules\Identity\Presentation\Http\Requests\Api\V1\Identity\ResetPasswordRequest;
 use App\Modules\Identity\Application\Commands\RequestPasswordResetCommand;
 use App\Modules\Identity\Application\Commands\ResetPasswordCommand;
 use App\Modules\Identity\Application\Exceptions\InvalidAccountActionToken;
 use App\Modules\Identity\Application\Exceptions\InvalidRegistrationInput;
-use App\Modules\Identity\Application\UseCases\RequestPasswordReset;
-use App\Modules\Identity\Application\UseCases\ResetPassword;
+use App\Modules\Identity\Application\Actions\RequestPasswordResetAction;
+use App\Modules\Identity\Application\Actions\ResetPasswordAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 
@@ -20,7 +20,7 @@ final class PasswordResetController extends Controller
 {
     public function request(
         ForgotPasswordRequest $request,
-        RequestPasswordReset $requestPasswordReset,
+        RequestPasswordResetAction $requestPasswordReset,
     ): JsonResponse {
         $requestPasswordReset->execute(
             new RequestPasswordResetCommand($request->validated('email')),
@@ -33,7 +33,7 @@ final class PasswordResetController extends Controller
 
     public function reset(
         ResetPasswordRequest $request,
-        ResetPassword $resetPassword,
+        ResetPasswordAction $resetPassword,
     ): JsonResponse {
         $validated = $request->validated();
 

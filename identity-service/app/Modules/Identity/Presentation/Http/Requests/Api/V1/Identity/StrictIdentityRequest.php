@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Requests\Api\V1\Identity;
+namespace App\Modules\Identity\Presentation\Http\Requests\Api\V1\Identity;
 
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
 use Closure;

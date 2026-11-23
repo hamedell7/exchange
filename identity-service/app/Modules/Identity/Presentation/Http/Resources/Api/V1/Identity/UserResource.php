@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Resources\Api\V1\Identity;
+namespace App\Modules\Identity\Presentation\Http\Resources\Api\V1\Identity;
 
 use App\Modules\Identity\Domain\Entities\User;
 use Illuminate\Http\Request;

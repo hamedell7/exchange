@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Identity\Application\UseCases;
+namespace App\Modules\Identity\Application\Actions;
 
-use App\Modules\Identity\Application\Commands\RequestPasswordResetCommand;
+use App\Modules\Identity\Application\Commands\RequestEmailVerificationCommand;
 use App\Modules\Identity\Application\Contracts\AccountActionTokenRepository;
 use App\Modules\Identity\Application\Contracts\Clock;
 use App\Modules\Identity\Application\Contracts\IdentityMailer;
@@ -15,7 +15,7 @@ use App\Modules\Identity\Application\Enums\AccountAction;
 use App\Modules\Identity\Domain\Enums\UserStatus;
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
 
-final readonly class RequestPasswordReset
+final readonly class RequestEmailVerificationAction
 {
     public function __construct(
         private UserRepository $users,
@@ -27,13 +27,14 @@ final readonly class RequestPasswordReset
     ) {
     }
 
-    public function execute(RequestPasswordResetCommand $command): void
+    public function execute(RequestEmailVerificationCommand $command): void
     {
         $email = new EmailAddress($command->email);
         $user = $this->users->findByEmail($email);
 
-        // The same successful response is returned for unknown addresses.
-        if ($user === null || $user->status() === UserStatus::Closed) {
+        // Keep the response indistinguishable for unknown and already verified
+        // addresses so this endpoint cannot be used to enumerate accounts.
+        if ($user === null || $user->status() !== UserStatus::PendingVerification) {
             return;
         }
 
@@ -42,12 +43,12 @@ final readonly class RequestPasswordReset
 
         $this->transactions->run(fn () => $this->tokens->issue(
             $user->id(),
-            AccountAction::ResetPassword,
+            AccountAction::VerifyEmail,
             hash('sha256', $plainToken),
-            $now->modify('+30 minutes'),
+            $now->modify('+60 minutes'),
             $now,
         ));
 
-        $this->mailer->sendPasswordReset($email, $plainToken);
+        $this->mailer->sendEmailVerification($email, $plainToken);
     }
 }

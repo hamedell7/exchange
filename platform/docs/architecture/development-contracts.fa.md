@@ -20,29 +20,36 @@
 
 ```text
 app/
-├── Http/                         # ورودی و خروجی HTTP
-├── Models/                       # فقط Eloquentهای متعارف Laravel، در صورت نیاز
-├── Providers/                    # اتصال قراردادها به Adapterها
+├── Http/                         # concerns HTTP عمومی و واقعاً مشترک
+├── Models/                       # Eloquentهای متعارف Laravel، در صورت نیاز
+├── Providers/                    # Composition Root و اتصال Portها به Adapterها
 └── Modules/
     └── <Context>/
+        ├── Presentation/
+        │   └── Http/
+        │       ├── Controllers/
+        │       ├── Requests/
+        │       ├── Resources/
+        │       └── routes.php
         ├── Domain/
         │   ├── Entities/
         │   ├── ValueObjects/
-        │   └── Policies/          # فقط وقتی قانون دامنه واقعاً چندبخشی/مستقل است
+        │   └── Policies/
         ├── Application/
-        │   ├── Commands/
-        │   ├── UseCases/
-        │   ├── Contracts/         # Portهای لازم برای وابستگی بیرونی
-        │   ├── Exceptions/        # خطاهای قابل انتظار Application
-        │   └── Results/           # فقط وقتی خروجی مستقل ارزش دارد
+        │   ├── Commands/         # ورودی‌های immutable و تایپ‌شده
+        │   ├── Actions/          # اجرای Use Caseها
+        │   ├── Contracts/        # Portهای موردنیاز Application
+        │   ├── Exceptions/
+        │   └── Results/          # فقط در صورت نیاز واقعی
         └── Infrastructure/
             ├── Persistence/
-            ├── Hashing/
-            └── ...
+            └── ...               # Adapterهای framework و سرویس بیرونی
 ```
 
 - این درخت نقشه اجباری برای ساخت همه پوشه‌ها نیست؛ پوشه را هنگام نیاز واقعی ایجاد کنید.
 - ماژول‌محوری بر نوع تکنولوژی اولویت دارد؛ کد یک قابلیت نباید بین پوشه‌های عمومی نامرتبط پخش شود.
+- Presentation هر Context در خود ماژول نگهداری می‌شود؛ پوشه `app/Http` فقط برای اجزای واقعاً عمومی و مشترک است.
+- Action اجرای یک Use Case است؛ برای یک عملیات، Action را با Service یا Handler هم‌مسئولیت تکرار نکنید.
 - قرار داشتن Eloquent Model در `app/Models` به‌تنهایی نقض معماری نیست. ممنوعیت، وابستگی Domain به Eloquent است.
 - نام‌گذاری و مسیرهای فعلی می‌توانند با رشد یک ماژول تکامل یابند؛ جابه‌جایی فایل بدون بهبود مرز یا فهم کد هدف نیست.
 

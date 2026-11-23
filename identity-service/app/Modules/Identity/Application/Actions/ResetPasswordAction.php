@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Identity\Application\UseCases;
+namespace App\Modules\Identity\Application\Actions;
 
 use App\Modules\Identity\Application\Commands\ResetPasswordCommand;
 use App\Modules\Identity\Application\Contracts\AccountActionTokenRepository;
@@ -17,7 +17,7 @@ use App\Modules\Identity\Domain\Enums\UserStatus;
 use App\Modules\Identity\Domain\Policies\PasswordPolicy;
 use InvalidArgumentException;
 
-final readonly class ResetPassword
+final readonly class ResetPasswordAction
 {
     public function __construct(
         private AccountActionTokenRepository $tokens,
