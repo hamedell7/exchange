@@ -10,7 +10,7 @@ use App\Modules\Identity\Application\Contracts\Clock;
 use App\Modules\Identity\Application\Contracts\IdentityMailer;
 use App\Modules\Identity\Application\Contracts\TokenGenerator;
 use App\Modules\Identity\Application\Contracts\TransactionRunner;
-use App\Modules\Identity\Application\Contracts\UserReader;
+use App\Modules\Identity\Application\Contracts\UserRepository;
 use App\Modules\Identity\Application\Enums\AccountAction;
 use App\Modules\Identity\Domain\Enums\UserStatus;
 use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
@@ -18,7 +18,7 @@ use App\Modules\Identity\Domain\ValueObjects\EmailAddress;
 final readonly class RequestPasswordResetAction
 {
     public function __construct(
-        private UserReader $users,
+        private UserRepository $users,
         private AccountActionTokenRepository $tokens,
         private TokenGenerator $tokenGenerator,
         private IdentityMailer $mailer,

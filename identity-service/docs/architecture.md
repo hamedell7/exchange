@@ -21,6 +21,8 @@ Identity is one bounded context and one independently deployed Laravel service. 
             ├── Application/
             │   ├── Commands/
             │   ├── Actions/
+            │   ├── Queries/          # add with the first independent read use case
+            │   ├── QueryHandlers/    # add with the first independent read use case
             │   ├── Contracts/
             │   ├── Enums/
             │   └── Exceptions/
@@ -38,7 +40,7 @@ Identity is one bounded context and one independently deployed Laravel service. 
                 ├── Persistence/Eloquent/
                 └── Tokens/
 
-Create a folder only when a concrete capability needs it. An Application/Queries folder is introduced when an independent read-only use case exists; it is not a mandatory empty layer.
+The tree is a guide, not a requirement to create empty folders. In particular, Queries and QueryHandlers are created when a concrete read-only use case, its consumer, authorization rules, and output contract are known.
 
 ## Responsibilities and dependencies
 
@@ -56,11 +58,12 @@ The root routes/api.php loads the Identity module's route file; endpoint definit
 ### Application
 
 - A Command is an immutable, typed input DTO expressing one state-changing intent.
-- An Action is the implementation of one state-changing use case. It coordinates Domain behavior and required output ports; it does not own business invariants.
+- An Action executes one state-changing use case. In this project it is the command-side executor; a separate CommandHandler class would duplicate the Action responsibility.
+- A Query is an immutable, typed request for data and must not change system state.
+- A QueryHandler executes one specific Query and returns the consumer's read-specific DTO/projection. Do not return an Eloquent model or a write-side Domain Aggregate merely to reuse it.
 - Application Contracts are ports for capabilities outside Application, such as persistence, hashing, mail, token/ID generation, clock, and transaction boundaries.
-- UserRepository is the write port and exposes only aggregate persistence operations (add/save).
-- UserReader is the read port and exposes aggregate lookup operations. The current write workflows use it only to load an aggregate before applying a Domain transition.
-- Do not add a second Service or Handler that repeats an Action's responsibility.
+- UserRepository is the Domain Aggregate persistence boundary. It exposes add/save and aggregate reconstitution lookups (findById/findByEmail) needed by state-changing workflows.
+- Independent read-only Queries use a focused read adapter and projection rather than going through UserRepository.
 - Add a Result DTO only when another transport or consumer needs a stable output contract that is materially different from the Domain object.
 
 ### Domain
@@ -71,7 +74,7 @@ Domain has no dependency on Laravel, Eloquent, HTTP, SQL, Redis, queues, mail tr
 
 ### Infrastructure
 
-Infrastructure implements Application ports. EloquentUserRepository handles writes and maps Domain aggregates to persisted records. EloquentUserReader owns read queries and reconstitutes Domain aggregates for workflows that must perform a subsequent state transition. Hashing, mail, clock, token generation, and transaction implementations are also infrastructure adapters.
+Infrastructure implements Application ports. EloquentUserRepository persists and reconstitutes the User aggregate for command-side state transitions. A future independent Query will have a focused read adapter that can use Eloquent or Query Builder to return a narrow projection without hydrating the aggregate.
 
 The Laravel App\Models\User remains the framework authentication/persistence model under the conventional app/Models path, separate from the Domain User. This follows the Exchange architecture contract: a conventional Eloquent model location is acceptable as long as Domain never imports it and only Infrastructure persistence code depends on it.
 
@@ -79,48 +82,37 @@ The Laravel service provider is the composition root for binding ports to concre
 
 ## Dependency direction
 
-    HTTP Request
-        |
-        v
-    Presentation Controller + Form Request
-        |
-        v
-    Application Command -> Application Action
-        |
-        v
-    Domain Aggregate / Value Objects / Policies
-        ^
-        |
-    Infrastructure adapters implement Application Contracts
-        |
-        v
-    Eloquent / PostgreSQL / Laravel Hash / Mail / Clock
+    Command path:
+    Presentation Command -> Application Action -> Domain Aggregate
+        -> UserRepository -> PostgreSQL
+
+    Independent Query path (when introduced):
+    Presentation -> Application Query -> QueryHandler
+        -> read adapter -> DTO/projection <- PostgreSQL
 
 Source dependencies point inward: Presentation depends on Application; Application depends on Domain and its own ports; Infrastructure depends inward to implement those ports.
 
 ## Read/write separation (CQRS)
 
-CQRS is introduced logically, not by splitting the database:
+CQRS is a logical separation of change-oriented and read-oriented use cases. It does not require separate databases.
 
-- Write path: Presentation Command -> Application Action -> Domain transition -> UserRepository -> PostgreSQL.
-- Read access: Application uses UserReader -> EloquentUserReader -> PostgreSQL. Read responsibilities no longer live on the write repository.
-- The same PostgreSQL database and schema serve both paths. No replica, synchronization mechanism, or eventual consistency is introduced.
+- Command path: Commands + Actions coordinate Domain behavior; UserRepository loads and persists the Aggregate.
+- Query path: a specific Query + QueryHandler reads a purpose-built projection through a focused read adapter. It does not call a write Action or hydrate an Aggregate when a projection is sufficient.
+- Both paths currently use the same PostgreSQL database and schema. No replica, synchronization mechanism, or eventual consistency is introduced.
 
-The existing verification-resend, password-reset-request, email-verification, and password-reset workflows need to locate an existing aggregate before they can decide whether or how to change it. Those lookups now pass through UserReader, while persistence of state changes passes through UserRepository.
+The existing verification-resend, password-reset-request, email-verification, and password-reset workflows are state-changing use cases. Their lookups load an Aggregate so the Action can evaluate its status or apply a Domain transition; these lookups correctly remain in UserRepository. They are not independent read-only Queries.
 
-This is the first logical CQRS boundary, not a claim that the service already has a separate public Query API or optimized read model. Login and user-profile reads remain out of scope until the Gateway authentication and authorization contract is defined. Do not expose users by ID or email through an unauthenticated endpoint.
+No independent read-only public use case is currently implemented. Login and user-profile reads remain out of scope until the Gateway authentication and authorization contract is defined. Do not expose users by ID or email through an unauthenticated endpoint.
 
-When an independent read-only use case is defined, add one focused Application Query and a read-specific DTO/projection for its consumer. Prefer a focused Eloquent query for joins and projections; introduce a dedicated Read Model or database replica only when requirements or measured performance justify them. Do not add a generic query bus or a Query DTO + Query Handler + Query Service triplet for a simple read.
-
-Do not create generic repositories for every table. Repository ports are for persisted aggregate roots; read queries should not be forced through the write repository.
+When an independent read-only use case is defined, add one specific Query, one QueryHandler, and the smallest output DTO/projection needed by its consumer. A focused Eloquent/Query Builder adapter is sufficient initially. Introduce a separate Read Model storage or database replica only when requirements or measured performance justify them. No generic Query bus or mediator is required.
 
 ## Complexity guardrails
 
 - No Value Object per database column.
 - No Repository per table.
 - No generic CRUD repository or generic service layer.
-- No Command + Handler + Action triplet for one use case.
-- No Query DTO + Query Handler + Query Service triplet for a simple read.
+- No Command + CommandHandler + Action triplet for one use case; Action is the chosen command executor here.
+- No Query DTO + QueryHandler + Query Service triplet for a simple read.
 - No Job or queue for every Action.
 - No Event Sourcing or second database by default.
 - No empty architecture folders or speculative submodules.
@@ -133,6 +125,6 @@ Do not create generic repositories for every table. Repository ports are for per
 - Application: unit tests with mocked/fake ports.
 - Infrastructure: integration tests for Eloquent mapping, transactions, and database-specific constraints.
 - Presentation: Laravel feature tests for routes, validation, status codes, response whitelists, and rate limits.
-- Read adapter: integration tests verify ID lookup, normalized-email lookup, missing records, and Domain reconstitution.
+- Repository integration tests verify aggregate lookup by ID, normalized email, missing records, and Domain reconstitution.
 
 CI is configured to run the Identity test suite against SQLite and PostgreSQL.
