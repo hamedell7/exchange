@@ -6,13 +6,13 @@ This service uses Laravel 13 and PHP 8.3+.
 
 Identity is a module-first Laravel service. Keep code for an Identity capability together under app/Modules/Identity:
 
-- Presentation/Http: HTTP controllers, Form Requests, API Resources, and module routes.
+- Presentation/Http: HTTP controllers, Form Requests, API Resources, middleware, and module routes.
 - Application/Commands: immutable, typed input contracts for state-changing use cases.
 - Application/Actions: execution/orchestration of Commands. This project uses Actions instead of adding a second CommandHandler class for each Command.
-- Application/Queries: immutable, typed input contracts for independent read-only use cases; create this folder when the first real Query exists.
-- Application/QueryHandlers: execute Queries and return a read-specific DTO/projection; create a handler per real Query, without a generic bus or mediator.
+- Application/Queries: immutable, typed input contracts for independent read-only use cases.
+- Application/QueryHandlers: execute Queries and return read-specific DTOs/projections; one Handler per real Query, without a generic bus or mediator.
+- Application/ReadModels: narrow output models owned by the Application read use case, not Domain entities.
 - Application/Contracts: ports required by Application from persistence, clocks, mail, hashing, ID/token generation, or transactions.
-- Application/Exceptions and Enums: stable application outcomes and application-level concepts.
 - Domain: entities/aggregate roots, value objects, policies, and business invariants.
 - Infrastructure: Laravel/Eloquent adapters implementing Application contracts.
 
@@ -31,10 +31,18 @@ Do not create speculative modules such as Sessions, MFA, or Credentials until th
 
 - Commands represent state-changing intent; Actions execute the use case and coordinate Domain behavior.
 - UserRepository is the aggregate persistence boundary. A write use case may load an aggregate through findById/findByEmail, apply a Domain transition, and save it.
-- Independent read-only use cases must not be routed through UserRepository just because it can load aggregates. Implement them as a specific Query + QueryHandler and a read-specific projection/DTO, backed by a focused Infrastructure read adapter/SQL query.
-- The Query side is introduced only when its consumer, authorization rules, and output contract are known. Do not expose account data through an unauthenticated lookup endpoint.
+- Independent read-only use cases use a specific Query + QueryHandler + read port + narrow ReadModel; they must not be routed through UserRepository or hydrate Domain aggregates when a projection is sufficient.
+- The user-list use case is implemented as ListUsersQuery -> ListUsersQueryHandler -> UserListReader -> UserListPage/UserListItem.
 - Read and write currently use the same PostgreSQL database and schema. No replica, synchronization mechanism, mediator, command bus, or event sourcing is needed by default.
-- Do not add a generic Query bus or a Query DTO + Handler + Service triplet. One specific Query and one specific Handler are enough when a real read use case is added.
+- Do not add a generic Query bus or a Query DTO + Handler + Service triplet. One specific Query and one specific Handler are enough.
+
+## User-list API security
+
+- GET /api/v1/identity/users is a server-to-server read endpoint protected by X-Identity-Admin-Token.
+- Configure IDENTITY_USERS_READ_TOKEN with at least 64 random hexadecimal characters (32 random bytes).
+- The secret belongs in a backend Secret Store. Never place it in browser code, a frontend environment variable exposed to the browser, a public Postman environment, or a committed .env file.
+- The middleware fails closed when the secret is missing and compares the supplied value with hash_equals.
+- This shared machine credential is not per-user RBAC and does not replace the Gateway's eventual authentication/authorization contract.
 
 ## Working conventions
 

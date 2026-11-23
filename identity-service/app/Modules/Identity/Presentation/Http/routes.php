@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Modules\Identity\Presentation\Http\Controllers\Api\V1\Identity\EmailVerificationController;
+use App\Modules\Identity\Presentation\Http\Controllers\Api\V1\Identity\ListUsersController;
 use App\Modules\Identity\Presentation\Http\Controllers\Api\V1\Identity\PasswordResetController;
 use App\Modules\Identity\Presentation\Http\Controllers\Api\V1\Identity\RegistrationController;
+use App\Modules\Identity\Presentation\Http\Middleware\RequireIdentityAdminReadToken;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/identity')->group(function (): void {
@@ -27,4 +29,11 @@ Route::prefix('v1/identity')->group(function (): void {
     Route::post('/password/reset', [PasswordResetController::class, 'reset'])
         ->middleware('throttle:10,1')
         ->name('identity.password.reset');
+
+    Route::get('/users', ListUsersController::class)
+        ->middleware([
+            RequireIdentityAdminReadToken::class,
+            'throttle:60,1',
+        ])
+        ->name('identity.users.index');
 });

@@ -39,8 +39,15 @@ Email verification links have a 60-minute lifetime. Password reset links have a 
 | POST | /api/v1/identity/email/verification/resend | Sends a new verification email when applicable |
 | POST | /api/v1/identity/password/forgot | Starts password reset without disclosing account existence |
 | POST | /api/v1/identity/password/reset | Consumes token and replaces password hash |
+| GET | /api/v1/identity/users | Returns a filtered, paginated user projection; server-to-server token required |
 
 Resend and forgot-password always return the same 202 response whether the email exists or not. This avoids account enumeration. They are rate-limited at the HTTP boundary by both caller IP and a hash of the normalized email identity.
+
+## User-list Query API
+
+The user-list endpoint uses a dedicated Query, QueryHandler, and read projection. It supports optional search (name or email), status, page, and per_page (1–100; default 25). The response contains only id, name, email, status, email verification date, registration date, and pagination metadata.
+
+This is an administrative server-to-server endpoint protected by X-Identity-Admin-Token. Configure IDENTITY_USERS_READ_TOKEN with a random 32-byte hex secret (at least 64 characters). Keep it only in a backend Secret Store. It must not be embedded in browser code or a public Postman environment. This shared credential gates machine access; it is not a replacement for the future end-user/admin-role authorization contract.
 
 ## Request validation and API Resources
 

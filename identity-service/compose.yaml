@@ -13,6 +13,7 @@ services:
       APP_ENV: ${APP_ENV:-local}
       APP_DEBUG: ${APP_DEBUG:-true}
       APP_URL: ${APP_URL:-http://localhost:8001}
+      IDENTITY_USERS_READ_TOKEN: ${IDENTITY_USERS_READ_TOKEN:-}
       LOG_CHANNEL: stderr
       HASH_DRIVER: ${HASH_DRIVER:-argon2id}
       DB_CONNECTION: pgsql
