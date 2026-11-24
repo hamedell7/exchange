@@ -175,6 +175,10 @@ final class LoginTest extends TestCase
 
         $this->travel(2)->minutes();
 
+        // Sanctum's RequestGuard memoizes the authenticated user between
+        // requests in this test process; a fresh HTTP request gets a fresh guard.
+        $this->app['auth']->forgetGuards();
+
         $this->withToken($accessToken)
             ->getJson('/api/v1/identity/me')
             ->assertUnauthorized();
