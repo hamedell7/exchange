@@ -41,15 +41,17 @@ platform\infrastructure\scripts\bootstrap-databases.cmd
 
 اگر قبلاً شبکه `exchange-network` را دستی ساخته‌ای، پیش از اجرای Compose جدید وضعیت آن را با `docker network inspect exchange-network` بررسی کن. شبکه‌ای که دستی ساخته شده ممکن است با شبکه تحت مدیریت Compose تداخل داشته باشد؛ آن را بدون بررسی کانتینرهای متصل حذف نکن.
 
-## Database bootstrap
+## انتقال از Composeهای قبلی سرویس‌ها
 
-پس از سالم شدن PostgreSQL، در CMD از ریشه مخزن اجرا کن:
+در نسخه قبلی هر سرویس کانتینر PostgreSQL خودش را داشت. برای اینکه کانتینرهای دیتابیس قدیمی به‌عنوان orphan روشن نمانند، بعد از دریافت تغییرات، برای هر سرویس یک‌بار دستور متناظر را اجرا کن:
 
-```cmd
-platform\infrastructure\scripts\bootstrap-databases.cmd
+```powershell
+docker compose --env-file identity-service/.env -f identity-service/compose.yaml down --remove-orphans
+docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml down --remove-orphans
+docker compose --env-file trading-service/.env -f trading-service/compose.yaml down --remove-orphans
 ```
 
-این اسکریپت سه Role و سه Database ایجاد/همگام می‌کند و دسترسی CONNECT عمومی را از هر Database می‌گیرد. نام کاربری و رمزها را از `platform/infrastructure/.env` می‌خواند.
+این دستورات کانتینرهای قبلی را متوقف و حذف می‌کنند، اما Volumeهای PostgreSQL قدیمی را حذف نمی‌کنند. داده‌های آن Volumeها خودکار به PostgreSQL مرکزی منتقل نمی‌شوند؛ اگر داده‌ای لازم داری، قبل از کنار گذاشتن دیتابیس‌های قبلی از آن‌ها Backup بگیر. سپس زیرساخت مرکزی را بالا بیاور، bootstrap را اجرا کن و اپلیکیشن‌ها را دوباره اجرا کن. از `down -v` استفاده نکن.
 
 ## تست اتصال
 
