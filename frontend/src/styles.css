@@ -547,3 +547,5 @@ svg { flex-shrink: 0; }
   .market-cta { flex-direction: column; align-items: flex-start; margin: 5px 14px 38px; padding: 21px; }.market-cta h2 { font-size: 15px; }.market-cta > a { width: 100%; }
   .market-footer { flex-wrap: wrap; gap: 8px 16px; padding: 15px; }.market-footer span:last-child { width: 100%; margin-right: 0; }
 }
+
+.market-asset-logo-fallback { display: inline-grid; place-items: center; color: #426077; background: linear-gradient(145deg,#e5f2ef,#eaf0f7); font-size: 12px; font-weight: 800; }
