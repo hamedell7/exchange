@@ -1,0 +1,46 @@
+name: Platform Compose validation
+
+on:
+  push:
+    paths:
+      - "platform/infrastructure/**"
+      - "platform/api-gateway/**"
+      - "identity-service/compose.yaml"
+      - "wallet-service/compose.yaml"
+      - "trading-service/compose.yaml"
+      - "market-data-service/compose.yaml"
+      - ".github/workflows/platform-compose.yml"
+  pull_request:
+    paths:
+      - "platform/infrastructure/**"
+      - "platform/api-gateway/**"
+      - "identity-service/compose.yaml"
+      - "wallet-service/compose.yaml"
+      - "trading-service/compose.yaml"
+      - "market-data-service/compose.yaml"
+      - ".github/workflows/platform-compose.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  compose-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate shared platform Compose
+        run: docker compose --env-file platform/infrastructure/.env.example -f platform/infrastructure/compose.yaml config --quiet
+
+      - name: Validate Identity Compose
+        run: docker compose --env-file identity-service/.env.example -f identity-service/compose.yaml config --quiet
+
+      - name: Validate Wallet Compose
+        run: docker compose --env-file wallet-service/.env.example -f wallet-service/compose.yaml config --quiet
+
+      - name: Validate Trading Compose
+        run: docker compose --env-file trading-service/.env.example -f trading-service/compose.yaml config --quiet
+
+      - name: Validate Market Data Compose
+        run: docker compose --env-file market-data-service/.env.example -f market-data-service/compose.yaml config --quiet
