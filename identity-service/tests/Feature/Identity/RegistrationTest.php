@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Identity;
 
+use App\Mail\Identity\EmailVerificationMail;
 use App\Models\User;
-use App\Modules\Identity\Application\Contracts\UserIdGenerator;
-use App\Modules\Identity\Domain\ValueObjects\UserId;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -57,7 +56,7 @@ final class RegistrationTest extends TestCase
         self::assertSame(26, strlen($user->id));
         self::assertArrayNotHasKey('password', $response->json('data'));
         self::assertArrayNotHasKey('email_normalized', $user->toArray());
-        Mail::assertSent(\App\Modules\Identity\Infrastructure\Mail\EmailVerificationMail::class);
+        Mail::assertSent(EmailVerificationMail::class);
     }
 
     public function test_email_identity_is_case_insensitive_and_duplicate_returns_conflict(): void
@@ -78,19 +77,11 @@ final class RegistrationTest extends TestCase
     {
         $existing = User::factory()->create(['email' => 'existing@example.com']);
 
-        $this->app->instance(
-            UserIdGenerator::class,
-            new class($existing->id) implements UserIdGenerator {
-                public function __construct(private readonly string $existingId)
-                {
-                }
-
-                public function generate(): UserId
-                {
-                    return new UserId($this->existingId);
-                }
-            },
-        );
+        User::creating(static function (User $user) use ($existing): void {
+            if ($user->email === 'another@example.com') {
+                $user->setAttribute($user->getKeyName(), $existing->getKey());
+            }
+        });
 
         $this->withoutExceptionHandling();
         $this->expectException(QueryException::class);

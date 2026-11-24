@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Identity;
 
+use App\Mail\Identity\EmailVerificationMail;
+use App\Mail\Identity\PasswordResetMail;
 use App\Models\User;
-use App\Modules\Identity\Infrastructure\Mail\EmailVerificationMail;
-use App\Modules\Identity\Infrastructure\Mail\PasswordResetMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
