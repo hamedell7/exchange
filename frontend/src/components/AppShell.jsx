@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import {
   Activity, ArrowLeft, Bell, ChevronLeft, CircleHelp, LayoutDashboard,
-  LogOut, Menu, ShieldCheck, UserRound, Wallet, X, CandlestickChart,
+  LogOut, Menu, ShieldCheck, UserRound, Wallet, X, CandlestickChart, ChartNoAxesCombined,
 } from 'lucide-react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 const navigation = [
   { to: '/dashboard', label: 'پیشخوان', icon: LayoutDashboard, end: true },
+  { to: '/markets', label: 'بازار دارایی‌ها', icon: ChartNoAxesCombined },
   { to: '/wallet', label: 'کیف پول', icon: Wallet, disabled: true },
-  { to: '/trading', label: 'بازارها و معامله', icon: CandlestickChart, disabled: true },
+  { to: '/trading', label: 'معامله', icon: CandlestickChart, disabled: true },
   { to: '/activity', label: 'فعالیت‌ها', icon: Activity, disabled: true },
 ];
 
@@ -20,10 +21,11 @@ const accountNavigation = [
 
 const pageTitles = {
   '/dashboard': 'نمای کلی',
+  '/markets': 'بازار دارایی‌ها',
   '/profile': 'اطلاعات حساب',
   '/security': 'امنیت حساب',
   '/wallet': 'کیف پول',
-  '/trading': 'بازارها و معامله',
+  '/trading': 'معامله',
   '/activity': 'فعالیت‌ها',
 };
 
@@ -78,10 +80,10 @@ export default function AppShell() {
 
       <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-top">
-          <NavLink to="/dashboard" className="brand" onClick={() => setMobileOpen(false)}>
+          <Link to="/markets" className="brand" onClick={() => setMobileOpen(false)}>
             <span className="brand-symbol">E</span>
             <span className="brand-copy"><strong>EXCHANGE</strong><small>فضای کاربری</small></span>
-          </NavLink>
+          </Link>
           <button className="mobile-close icon-button" onClick={() => setMobileOpen(false)} aria-label="بستن منو"><X size={20} /></button>
         </div>
 

@@ -1,6 +1,6 @@
 # Exchange Frontend
 
-A single React application for the Exchange platform. It lives at the repository root, independently of the Laravel microservices, and is intended to become the shared user interface for Identity, Wallet and Trading.
+A single React application for the Exchange platform. It lives at the repository root, independently of the Laravel microservices, and is the shared public market directory and user interface for Identity, Wallet and Trading.
 
 ## Stack
 
@@ -25,7 +25,7 @@ npm run dev
 
 Open `http://localhost:5173`.
 
-The Vite dev server proxies `/api/*` requests to the local API Gateway. The frontend does not call Identity, Wallet or Trading containers directly.
+The Vite dev server proxies `/api/*` requests to the local API Gateway. The frontend does not call service containers directly.
 
 ## API boundary
 
@@ -33,9 +33,9 @@ The shared API client maps services to their Gateway prefixes:
 
 - Identity: `/api/v1/identity`
 - Wallet: `/api/v1/wallet`
-- Trading: `/api/v1/trading`
+- Trading: `/api/v1/trading`\n- Market Data: `/api/v1/market`
 
-Identity is integrated through the Gateway:
+The public market directory is available at `/` and `/markets`. It reads the public, paginated asset catalog from `GET /api/v1/market/assets` through the Gateway. Search supports asset name and symbol. Only static asset metadata is shown; prices, charts, USDT/Toman conversion and trading are intentionally not displayed until their APIs exist.\n\nIdentity is integrated through the Gateway:
 
 - `POST /api/v1/identity/login`
 - `POST /api/v1/identity/register`

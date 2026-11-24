@@ -3,6 +3,7 @@ const API_PREFIXES = Object.freeze({
   identity: '/api/v1/identity',
   wallet: '/api/v1/wallet',
   trading: '/api/v1/trading',
+  market: '/api/v1/market',
 });
 const TOKEN_KEY = 'exchange.identity.access_token';
 const EXPIRY_KEY = 'exchange.identity.expires_at';
@@ -37,8 +38,7 @@ export function clearSession() {
 
 /**
  * Shared API transport for every Exchange service.
- * Service-specific authentication contracts are intentionally not assumed:
- * only Identity requests currently use the Sanctum bearer token.
+ * Only Identity requests currently use the Sanctum bearer token.
  */
 export async function apiRequest(path, options = {}) {
   const {
@@ -71,7 +71,8 @@ export async function apiRequest(path, options = {}) {
       credentials: 'omit',
       signal,
     });
-  } catch {
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
     throw new Error('ارتباط با سرور برقرار نشد. روشن بودن API Gateway را بررسی کن.');
   }
 

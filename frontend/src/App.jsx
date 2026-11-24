@@ -7,6 +7,7 @@ import {
 import AccountPage from './pages/AccountPage.jsx';
 import ComingSoonPage from './pages/ComingSoonPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
+import MarketPage from './pages/MarketPage.jsx';
 import SecurityPage from './pages/SecurityPage.jsx';
 
 function NotFoundPage() {
@@ -15,7 +16,7 @@ function NotFoundPage() {
       <strong>404</strong>
       <h1>این صفحه پیدا نشد</h1>
       <p>نشانی واردشده معتبر نیست یا این صفحه وجود ندارد.</p>
-      <a href="/dashboard">بازگشت به پیشخوان</a>
+      <a href="/markets">بازگشت به بازارها</a>
     </div>
   );
 }
@@ -23,6 +24,9 @@ function NotFoundPage() {
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<MarketPage />} />
+      <Route path="/markets" element={<MarketPage />} />
+
       <Route element={<GuestRoute />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -32,7 +36,6 @@ export default function App() {
 
       <Route element={<PrivateRoute />}>
         <Route element={<AppShell />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<AccountPage />} />
           <Route path="/security" element={<SecurityPage />} />
