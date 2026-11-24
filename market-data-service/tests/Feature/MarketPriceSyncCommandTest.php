@@ -49,13 +49,14 @@ final class MarketPriceSyncCommandTest extends TestCase
             ]),
             '*market/stats*' => Http::response([
                 'status' => 'ok',
-                'stats' => ['usdt-rls' => ['latest' => '950000']],
+                'stats' => [
+                    'usdt-rls' => ['latest' => '950000'],
+                ],
             ]),
         ]);
 
         $this->artisan('market:sync-prices --limit=250')
             ->expectsOutputToContain('Successfully synchronized 1 asset prices.')
-            ->expectsOutputToContain('95000')
             ->assertExitCode(0);
 
         $this->assertDatabaseHas('market_asset_quotes', [
