@@ -4,19 +4,13 @@ import { Link } from 'react-router-dom';
 import { apiRequest } from '../api/client.js';
 
 const number = new Intl.NumberFormat('fa-IR');
-const fallback = (symbol = '') => `https://ui-avatars.com/api/?name=${encodeURIComponent(symbol)}&background=edf3f7&color=29445b&bold=true&size=80`;
-
 function AssetLogo({ asset }) {
   const [failed, setFailed] = useState(false);
-  return (
-    <img
-      className="market-asset-logo"
-      src={!failed && asset.logo_url ? asset.logo_url : fallback(asset.symbol)}
-      alt=""
-      loading="lazy"
-      onError={() => setFailed(true)}
-    />
-  );
+  if (failed || !asset.logo_url) {
+    return <span className="market-asset-logo market-asset-logo-fallback" aria-hidden="true">{asset.symbol?.slice(0, 1) || '?'}</span>;
+  }
+
+  return <img className="market-asset-logo" src={asset.logo_url} alt="" loading="lazy" onError={() => setFailed(true)} />;
 }
 
 export default function MarketPage() {
