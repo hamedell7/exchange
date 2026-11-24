@@ -33,7 +33,7 @@ docker compose --env-file platform/infrastructure/.env -f platform/infrastructur
 platform\infrastructure\scripts\bootstrap-databases.cmd
 ```
 
-این مرحله را پیش از اجرای اپلیکیشن‌ها انجام بده. هر سه اپلیکیشن از میزبان `postgres:5432` روی شبکه `exchange-network` استفاده می‌کنند.
+این مرحله را پیش از اجرای اپلیکیشن‌ها انجام بده. هر چهار سرویس از میزبان `postgres:5432` روی شبکه `exchange-network` استفاده می‌کنند.
 
 ## ترتیب اجرای اپلیکیشن‌ها
 
@@ -116,7 +116,7 @@ Invoke-RestMethod http://127.0.0.1:8080/healthz
 
 ## اگر زیرساخت قبلی را اجرا کرده‌ای
 
-نام پروژه Compose همچنان `exchange-platform` است تا Volumeهای فعلی و چرخه منابع قبلی حفظ شوند. نام شبکه نیز `exchange-network` است و سه Compose سرویس‌های Laravel آن را به‌صورت `external` مصرف می‌کنند. زیرساخت را پیش از اپلیکیشن‌ها اجرا کن و دیگر `docker network create exchange-network` اجرا نکن.
+نام پروژه Compose همچنان `exchange-platform` است تا Volumeهای فعلی و چرخه منابع قبلی حفظ شوند. نام شبکه نیز `exchange-network` است و چهار Compose سرویس‌های Laravel آن را به‌صورت `external` مصرف می‌کنند. زیرساخت را پیش از اپلیکیشن‌ها اجرا کن و دیگر `docker network create exchange-network` اجرا نکن.
 
 در نسخه قبلی، Gateway به‌صورت دستی با `docker run` اجرا می‌شد. اگر کانتینر قدیمی با نام `exchange-api-gateway` هنوز وجود دارد، پیش از اجرای Compose جدید یک‌بار آن را حذف کن:
 
