@@ -124,13 +124,17 @@ final class LoginTest extends TestCase
             ->assertOk()
             ->assertJsonPath('message', 'You have been signed out.');
 
-        $this->withToken($accessToken)
-            ->getJson('/api/v1/identity/me')
-            ->assertUnauthorized();
-
         $this->assertDatabaseMissing('personal_access_tokens', [
             'tokenable_id' => $user->getKey(),
         ]);
+
+        // A real HTTP request starts with a fresh guard. Clear Laravel's
+        // memoized RequestGuard between requests in this multi-request test.
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($accessToken)
+            ->getJson('/api/v1/identity/me')
+            ->assertUnauthorized();
     }
 
     public function test_authenticated_endpoints_require_a_bearer_token(): void
