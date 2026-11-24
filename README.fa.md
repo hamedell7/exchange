@@ -5,6 +5,7 @@
 ## ساختار مخزن
 
     exchange/
+    ├── frontend/               # React application shared by all services
     ├── identity-service/       # Laravel Identity service
     ├── wallet-service/         # Laravel Wallet service
     ├── trading-service/        # Laravel Trading service
@@ -13,6 +14,12 @@
         ├── infrastructure/     # PostgreSQL, Redis, RabbitMQ و شبکه مشترک
         ├── contracts/           # OpenAPI و Integration Event contracts
         └── docs/                # معماری، ADRها و Runbookها
+
+## Frontend یکپارچه
+
+پروژه React در پوشه مستقل `frontend/` قرار دارد و رابط کاربری مشترک Identity، Wallet و Trading خواهد بود. این پروژه به کد داخلی Laravel وابسته نیست و درخواست‌ها را فقط از مسیر API Gateway ارسال می‌کند.
+
+راهنمای اجرا و تنظیمات فرانت‌اند: [frontend/README.md](frontend/README.md)
 
 ## قراردادهای معماری و توسعه
 
@@ -26,6 +33,8 @@
 ## مرزهای Docker در توسعه محلی
 
 - هر Laravel service با Compose مستقل اجرا می‌شود.
+- فرانت‌اند React مستقل است و در زمان توسعه با Vite اجرا می‌شود.
+- درخواست‌های `/api/*` در Vite به API Gateway محلی روی پورت 8080 پروکسی می‌شوند.
 - سورس هر سرویس به‌صورت Bind Mount از پوشه همان سرویس به /var/www/html متصل است؛ ویرایش فایل‌ها روی Host بلافاصله داخل کانتینر دیده می‌شود.
 - پوشه vendor هر سرویس Named Volume مستقل دارد تا Composer dependencyهای Linux با فایل‌های Host ویندوز مخلوط نشوند.
 - دیتابیس هر سرویس و داده‌های زیرساخت در Named Volumeهای مستقل نگهداری می‌شوند.
@@ -49,21 +58,24 @@
         Copy-Item .\trading-service\.env.example .\trading-service\.env
     }
 
-زیرساخت را اجرا کنید:
+Platform را اجرا کنید:
 
-    docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d
+    docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d --build
 
-سپس هر سرویس را مستقل Build و اجرا کنید. برای نمونه:
+سپس هر سرویس Laravel را مستقل Build و اجرا کنید. برای نمونه:
 
     docker compose --env-file identity-service/.env -f identity-service/compose.yaml up -d --build
     docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml up -d --build
     docker compose --env-file trading-service/.env -f trading-service/compose.yaml up -d --build
 
-برای ساخت APP_KEY هر سرویس:
+برای اجرای فرانت‌اند از ریشه مخزن:
 
-    docker compose --env-file identity-service/.env -f identity-service/compose.yaml exec app php artisan key:generate
+    cd frontend
+    Copy-Item .env.example .env
+    npm install
+    npm run dev
 
-همین دستور برای Wallet و Trading نیز با مسیر مربوط به خودشان اجرا می‌شود. سپس Migration همان سرویس را اجرا کنید. راهنمای کامل هر سرویس در README همان پوشه قرار دارد.
+سپس `http://localhost:5173` را باز کنید. درخواست‌های API از طریق Gateway در `http://localhost:8080` ارسال می‌شوند.
 
 ## نگهداری داده‌ها
 
