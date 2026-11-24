@@ -5,9 +5,10 @@
 - PostgreSQL مرکزی
 - Redis
 - RabbitMQ
+- Adminer برای مشاهده دیتابیس‌ها
 - API Gateway مبتنی بر Nginx
 
-سه اپلیکیشن Laravel یعنی Identity، Wallet و Trading همچنان Compose مستقل خودشان را دارند و فقط از شبکه مشترک `exchange-network` استفاده می‌کنند.
+چهار اپلیکیشن Laravel یعنی Identity، Wallet، Trading و Market Data همچنان Compose مستقل خودشان را دارند و فقط از شبکه مشترک `exchange-network` استفاده می‌کنند.
 
 ## پیش‌نیاز و راه‌اندازی
 
@@ -19,12 +20,12 @@ if (-not (Test-Path .\platform\infrastructure\.env)) {
 }
 
 docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml config --quiet
-docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml pull postgres redis rabbitmq
+docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml pull postgres redis rabbitmq adminer
 docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d --build
 docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml ps
 ```
 
-این یک دستور Compose برای تمام مؤلفه‌های Platform است؛ Gateway هم همراه زیرساخت Build و اجرا می‌شود و پورت محلی `8080` را در اختیار می‌گیرد.
+این یک دستور Compose برای تمام مؤلفه‌های Platform است؛ Gateway هم همراه زیرساخت Build و اجرا می‌شود و پورت محلی `8080` را در اختیار می‌گیرد. رابط Adminer نیز روی `http://127.0.0.1:8081` در دسترس است و فقط روی loopback منتشر می‌شود.
 
 پس از بالا آمدن PostgreSQL، دیتابیس‌ها و Roleهای اختصاصی سرویس‌ها را ایجاد کن (اجرای مجدد این دستور امن است):
 
@@ -56,14 +57,41 @@ Gateway از DNS داخلی Docker برای resolve کردن نام سرویس�
 - `IDENTITY_SERVICE_HOST` و `IDENTITY_SERVICE_PORT`
 - `WALLET_SERVICE_HOST` و `WALLET_SERVICE_PORT`
 - `TRADING_SERVICE_HOST` و `TRADING_SERVICE_PORT`
+- `MARKET_DATA_SERVICE_HOST` و `MARKET_DATA_SERVICE_PORT`
 
 مقادیر Host پیش‌فرض با نام کانتینرهای سرویس‌ها هماهنگ هستند. مقادیر DB Roleها و رمزهایشان نیز باید با `DB_USERNAME`، `DB_DATABASE` و `DB_PASSWORD` در فایل `.env` هر سرویس یکسان باشند.
+
+## Market Data Service
+
+سرویس Market Data کاتالوگ ارزهای برتر بازار جهانی را نگهداری می‌کند. Compose و دیتابیس آن مستقل است.
+
+اگر فایل محیطی این سرویس را نداری، از نمونه بساز و مقدار کلید CMC را فقط در فایل محلی وارد کن:
+
+```powershell
+if (-not (Test-Path .\\market-data-service\\.env)) {
+    Copy-Item .\\market-data-service\\.env.example .\\market-data-service\\.env
+}
+```
+
+در فایل `market-data-service/.env` مقدار `CMC_API_KEY` را قرار بده. سپس زیرساخت و دیتابیس‌های سرویس را آماده کن و خود سرویس را اجرا کن:
+
+```powershell
+docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml up -d --build
+docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml exec app php artisan key:generate
+docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml exec app php artisan migrate --force
+docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml exec app php artisan market:sync-assets --limit=250
+```
+
+فرمان `market:sync-assets` همگام‌سازی کاتالوگ را فقط هنگام اجرای دستی انجام می‌دهد و هنوز زمان‌بندی خودکار یا WebSocket ندارد. راهنمای سرویس: [market-data-service/README.md](../../market-data-service/README.md).
+
+اگر `platform/infrastructure/.env` از قبل وجود دارد، سه متغیر `MARKET_DATA_DB_USERNAME`، `MARKET_DATA_DB_DATABASE` و `MARKET_DATA_DB_PASSWORD` اختیاری‌اند؛ اسکریپت bootstrap در صورت نبود آن‌ها از مقادیر محلی نمونه استفاده می‌کند. این مقادیر باید با `DB_USERNAME`، `DB_DATABASE` و `DB_PASSWORD` در فایل محلی Market Data هماهنگ باشند.
 
 ## پورت‌ها
 
 تمام پورت‌ها فقط روی `127.0.0.1` منتشر می‌شوند:
 
 - API Gateway: `8080` (قابل تغییر با `API_GATEWAY_PORT`)
+- Adminer: `8081` (فقط روی `127.0.0.1`)
 - PostgreSQL: `5432`
 - Redis: `6379`
 - RabbitMQ AMQP: `5672`
@@ -116,6 +144,8 @@ docker compose --env-file platform/infrastructure/.env -f platform/infrastructur
 ## نکات امنیتی و معماری
 
 - رمزهای Development ثابت و ساده‌اند؛ از آن‌ها در Production استفاده نکن.
+- Adminer ابزار مدیریتی توسعه است و نباید در Production مستقیماً در اینترنت منتشر شود.
+- کلید `CMC_API_KEY` فقط در فایل محلی `market-data-service/.env` قرار می‌گیرد و نباید در Git ثبت شود.
 - کاربر `exchange_admin` فقط برای عملیات مدیریتی محلی است؛ اپلیکیشن‌ها نباید با آن وصل شوند.
 - هر سرویس از Role و Database اختصاصی استفاده می‌کند.
 - ارتباط داده‌ای بین سرویس‌ها از طریق API یا Event است؛ نه Query مستقیم به دیتابیس سرویس دیگر.

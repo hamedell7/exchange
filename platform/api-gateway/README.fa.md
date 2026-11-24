@@ -39,6 +39,7 @@ Invoke-RestMethod http://127.0.0.1:8080/healthz
 | `/api/v1/identity/*` | Identity Service |
 | `/api/v1/trading/*` | Trading Service |
 | `/api/v1/wallet/*` | Wallet Service |
+| `/api/v1/market/*` | Market Data Service |
 | `/healthz` | سلامت پردازش Gateway |
 
 URI اصلی هنگام ارسال درخواست به سرویس مقصد حفظ می‌شود. برنامه هر سرویس باید همین پیشوندها را ارائه کند؛ در غیر این صورت، مسیرهای Gateway باید با قرارداد API هماهنگ شوند.
@@ -50,8 +51,11 @@ Gateway و سه Microservice روی شبکه مشترک Docker با نام `exch
 - `identity-service:8000`
 - `trading-service:8000`
 - `wallet-service:8000`
+- `market-data-service:8000`
 
 Nginx از DNS داخلی Docker برای resolve کردن نام‌ها در زمان درخواست استفاده می‌کند؛ بنابراین لازم نیست سرویس‌های Laravel هنگام شروع Gateway از قبل اجرا شده باشند. اگر کانتینر مقصد هنوز به شبکه متصل نشده باشد، درخواست آن مسیر موقتاً خطای اتصال می‌گیرد.
+
+مسیر Market Data برای خواندن عمومی کاتالوگ رمزارزهاست و برای مشاهده آن توکن Identity لازم نیست. سرویس مقصد باید پیشوند `/api/v1/market/` را خودش پیاده‌سازی کند؛ Gateway آن را حذف نمی‌کند.
 
 ## قابلیت‌های پیاده‌سازی‌شده
 

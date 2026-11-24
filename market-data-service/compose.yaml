@@ -1,0 +1,44 @@
+name: exchange-market-data
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: exchange-market-data:local
+    container_name: market-data-service
+    restart: unless-stopped
+    environment:
+      APP_NAME: market-data
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-http://localhost:8003}
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-market_data_db}
+      DB_USERNAME: ${DB_USERNAME:-market_data_app}
+      DB_PASSWORD: ${DB_PASSWORD:-local_market_data_dev}
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: database
+      CMC_API_KEY: ${CMC_API_KEY:-}
+      CMC_BASE_URL: ${CMC_BASE_URL:-https://pro-api.coinmarketcap.com}
+      CMC_HTTP_TIMEOUT: ${CMC_HTTP_TIMEOUT:-30}
+    volumes:
+      - type: bind
+        source: .
+        target: /var/www/html
+      - type: volume
+        source: market_data_vendor
+        target: /var/www/html/vendor
+    ports:
+      - "127.0.0.1:8003:8000"
+    networks:
+      - exchange-network
+volumes:
+  market_data_vendor:
+networks:
+  exchange-network:
+    external: true
+    name: exchange-network
