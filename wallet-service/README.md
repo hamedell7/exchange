@@ -32,7 +32,7 @@ docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml exe
 docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml exec app php artisan migrate
 ```
 
-The API is available at [http://localhost:8003](http://localhost:8003).
+The API is available at [http://localhost:8004](http://localhost:8003).
 
 ## Development volume model
 
