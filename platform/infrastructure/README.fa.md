@@ -21,6 +21,14 @@ docker compose --env-file platform/infrastructure/.env -f platform/infrastructur
 docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml ps
 ```
 
+پس از بالا آمدن PostgreSQL، دیتابیس‌ها و Roleهای اختصاصی سرویس‌ها را ایجاد کن (اجرای مجدد این دستور امن است):
+
+```cmd
+platform\infrastructure\scripts\bootstrap-databases.cmd
+```
+
+این مرحله را قبل از اجرای اپلیکیشن‌ها انجام بده. هر سه اپلیکیشن از میزبان `postgres:5432` روی شبکه `exchange-network` استفاده می‌کنند.
+
 در `.env` فقط مقادیر Development قرار بده. این فایل در Git ثبت نمی‌شود.
 
 این Compose شبکه مشترک را با نام صریح `exchange-network` ایجاد و مدیریت می‌کند. Compose سه سرویس Identity، Wallet و Trading این شبکه را به‌صورت `external` مصرف می‌کنند. بنابراین زیرساخت را قبل از سرویس‌های اپلیکیشن بالا بیاور و دیگر `docker network create exchange-network` اجرا نکن.
@@ -69,5 +77,8 @@ docker compose --env-file platform/infrastructure/.env -f platform/infrastructur
 - رمزهای Development ثابت و ساده‌اند؛ از آن‌ها در Production استفاده نکن.
 - کاربر `exchange_admin` فقط برای عملیات مدیریتی محلی است؛ اپلیکیشن‌ها نباید با آن وصل شوند.
 - هر سرویس از Role و Database اختصاصی استفاده می‌کند.
-- این Compose یک PostgreSQL Server محلی با Databaseهای جدا فراهم می‌کند؛ سرویس‌های Compose مستقل نیز می‌توانند دیتابیس اختصاصی خود را نگه دارند. توپولوژی Production، Backup، HA و سیاست دسترسی باید جداگانه تعیین شود.
+- این Compose تنها PostgreSQL محلی پروژه را اجرا می‌کند. Identity، Wallet و Trading هرکدام Database و Role اختصاصی خود را روی همین Server دارند و هیچ‌کدام کانتینر PostgreSQL جداگانه‌ای اجرا نمی‌کنند.
+- رمز هر Role در `platform/infrastructure/.env` باید با `DB_PASSWORD` متناظر در فایل `.env` همان سرویس یکسان باشد؛ مقادیر پیش‌فرض فایل‌های نمونه هماهنگ‌اند.
+- اگر قبلاً PostgreSQLهای محلی سرویس‌ها را اجرا کرده‌ای، Volumeهای قدیمی خودکار حذف نمی‌شوند و داده‌هایشان نیز خودکار منتقل نمی‌شود. برای حفظ داده‌ها قبل از کنار گذاشتن آن‌ها Backup بگیر؛ هرگز برای این جابه‌جایی `down -v` اجرا نکن.
+- توپولوژی Production، Backup، HA و سیاست دسترسی باید جداگانه تعیین شود.
 - پیش از استفاده عملیاتی از RabbitMQ و Redis، vhost/user و ACL اختصاصی هر سرویس را تنظیم کن.

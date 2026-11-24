@@ -19,7 +19,10 @@ Start shared infrastructure, which creates the external network `exchange-networ
 
 ```powershell
 docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d
+platform\infrastructure\scripts\bootstrap-databases.cmd
 ```
+
+The bootstrap command creates the three isolated databases and login roles on the shared PostgreSQL server. Keep the TRADING_DB_PASSWORD in the infrastructure `.env` equal to `DB_PASSWORD` in `trading-service/.env` (the example values already match).
 
 Build and start Trading, generate its key, and run migrations:
 
@@ -35,7 +38,7 @@ The API is available at [http://localhost:8002](http://localhost:8002).
 
 - `trading-service/.` is bind-mounted to `/var/www/html`, so host source changes appear immediately in the container.
 - `trading_vendor` is a named Docker volume for Linux Composer dependencies; it is mounted inside the source tree at `vendor`.
-- `trading_postgres_data` persists Trading's PostgreSQL data independently.
+- PostgreSQL is not part of this service Compose. Trading connects to the shared `postgres` container on `exchange-network`, using its own `trading_db` database and `trading_app` role.
 
 The generated `APP_KEY` is saved to `trading-service/.env` through the bind mount. Compose does not set an empty `APP_KEY` that could override the file value.
 
@@ -45,10 +48,10 @@ After changing `composer.lock`, run:
 docker compose --env-file trading-service/.env -f trading-service/compose.yaml exec app composer install
 ```
 
-Stop without deleting persistent data:
+Stop the service without deleting its Composer volume:
 
 ```powershell
 docker compose --env-file trading-service/.env -f trading-service/compose.yaml down
 ```
 
-Avoid `down -v` unless deleting the database and dependency volumes is intentional. This bind-mounted configuration is for development; production should run the built image without mounting the source tree.
+Avoid `down -v` unless deleting the Composer volume is intentional. Shared PostgreSQL data is owned by `platform/infrastructure` and must be managed there. This bind-mounted configuration is for development; production should run the built image without mounting the source tree.

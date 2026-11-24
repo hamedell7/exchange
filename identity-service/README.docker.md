@@ -19,7 +19,10 @@ Start the shared platform infrastructure first. It owns and creates the Docker n
 
 ```powershell
 docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d
+platform\infrastructure\scripts\bootstrap-databases.cmd
 ```
+
+The bootstrap command creates the three isolated databases and login roles on the shared PostgreSQL server. Keep `IDENTITY_DB_PASSWORD` in the infrastructure `.env` equal to `DB_PASSWORD` in `identity-service/.env` (the example values already match).
 
 Build and start Identity:
 
@@ -37,7 +40,7 @@ The application is available at [http://localhost:8001](http://localhost:8001).
 
 - The service directory is bind-mounted to `/var/www/html`. Source edits, `.env`, and local storage changes are visible on both sides.
 - `identity_vendor` is a Docker-managed named volume mounted over `/var/www/html/vendor`. It keeps Linux Composer dependencies separate from the Windows host filesystem. Docker initializes a new empty volume from the image's existing `vendor` directory.
-- `identity_postgres_data` persists this service's PostgreSQL data independently of the application source and dependencies.
+- PostgreSQL is not part of this service Compose. Identity connects to the shared `postgres` container on `exchange-network`, using its own `identity_db` database and `identity_app` role.
 
 When `composer.lock` changes, refresh the dependencies in the existing volume:
 
@@ -47,10 +50,10 @@ docker compose --env-file identity-service/.env -f identity-service/compose.yaml
 
 ## Lifecycle and safety
 
-Stop the service without deleting its database or Composer volume:
+Stop the service without deleting its Composer volume:
 
 ```powershell
 docker compose --env-file identity-service/.env -f identity-service/compose.yaml down
 ```
 
-Do not use `down -v` unless you intentionally want to delete the service's persistent volumes. The bind-mounted development setup is not intended for production deployments; production should run the immutable application image without a source bind mount.
+Do not use `down -v` unless you intentionally want to delete the Composer volume. The shared PostgreSQL data is owned by `platform/infrastructure` and must be managed there. The bind-mounted development setup is not intended for production deployments; production should run the immutable application image without a source bind mount.

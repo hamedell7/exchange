@@ -15,7 +15,7 @@ services:
       APP_URL: ${APP_URL:-http://localhost:8003}
       LOG_CHANNEL: stderr
       DB_CONNECTION: pgsql
-      DB_HOST: db
+      DB_HOST: postgres
       DB_PORT: 5432
       DB_DATABASE: wallet_db
       DB_USERNAME: wallet_app
@@ -33,38 +33,13 @@ services:
         target: /var/www/html/vendor
     ports:
       - "127.0.0.1:8003:8000"
-    depends_on:
-      db:
-        condition: service_healthy
     networks:
       - exchange-network
-      - database-network
-
-  db:
-    image: postgres:17-alpine
-    container_name: wallet-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: wallet_db
-      POSTGRES_USER: wallet_app
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-local_wallet_dev}
-    volumes:
-      - wallet_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wallet_app -d wallet_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - database-network
 
 volumes:
-  wallet_postgres_data:
   wallet_vendor:
 
 networks:
   exchange-network:
     external: true
     name: exchange-network
-  database-network:
-    internal: true

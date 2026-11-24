@@ -41,7 +41,12 @@ The Sanctum token authenticates Identity routes only. Gateway/Wallet/Trading tok
 
 ## Local development
 
-Run the service using its Compose file from the repository root:
+First start the shared infrastructure and initialize the service databases once:
+
+    docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d
+    platform\infrastructure\scripts\bootstrap-databases.cmd
+
+Then run the service using its Compose file from the repository root:
 
     docker compose --env-file identity-service/.env -f identity-service/compose.yaml up -d --build
     docker compose --env-file identity-service/.env -f identity-service/compose.yaml exec app php artisan migrate
