@@ -1,0 +1,40 @@
+name: Update Sanctum lockfile
+
+on:
+  push:
+    paths:
+      - "identity-service/composer.json"
+      - ".github/workflows/update-sanctum-lock.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, pdo_pgsql, pdo_sqlite
+          coverage: none
+
+      - name: Resolve and lock Sanctum
+        working-directory: identity-service
+        run: composer update laravel/sanctum --with-all-dependencies --no-interaction --prefer-dist --no-progress
+
+      - name: Commit lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add identity-service/composer.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(identity): lock Laravel Sanctum dependency"
+            git push origin HEAD:main
+          fi
