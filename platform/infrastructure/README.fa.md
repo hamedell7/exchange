@@ -97,6 +97,15 @@ docker compose --env-file market-data-service/.env -f market-data-service/compos
 - RabbitMQ AMQP: `5672`
 - RabbitMQ Management: `15672`
 
+پورت‌های HTTP مستقیم سرویس‌ها برای توسعه محلی:
+
+- Identity: `8001`
+- Trading: `8002`
+- Market Data: `8003`
+- Wallet: `8004`
+
+هر چهار پورت سرویس فقط روی `127.0.0.1` منتشر می‌شوند. مسیر اصلی فرانت‌اند همچنان از Gateway روی `8080` عبور می‌کند.
+
 سلامت Gateway:
 
 ```powershell
