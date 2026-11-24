@@ -151,4 +151,53 @@ final class LoginTest extends TestCase
             'is_admin' => true,
         ])->assertUnprocessable()->assertJsonValidationErrors('is_admin');
     }
+
+    public function test_access_token_expires_at_the_configured_time(): void
+    {
+        config()->set('identity.access_token_lifetime_minutes', 1);
+
+        User::factory()->create([
+            'email' => 'expiry@example.com',
+            'password' => Hash::make('correct-horse-battery-staple'),
+        ]);
+
+        $login = $this->postJson('/api/v1/identity/login', [
+            'email' => 'expiry@example.com',
+            'password' => 'correct-horse-battery-staple',
+        ])->assertOk();
+
+        $accessToken = $login->json('data.access_token');
+        self::assertIsString($accessToken);
+
+        $this->withToken($accessToken)
+            ->getJson('/api/v1/identity/me')
+            ->assertOk();
+
+        $this->travel(2)->minutes();
+
+        // Sanctum's RequestGuard memoizes the authenticated user between
+        // requests in this test process; a fresh HTTP request gets a fresh guard.
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($accessToken)
+            ->getJson('/api/v1/identity/me')
+            ->assertUnauthorized();
+    }
+
+    public function test_login_is_rate_limited_per_normalized_email(): void
+    {
+        $payload = [
+            'email' => 'RateLimit@example.com',
+            'password' => 'wrong-password',
+        ];
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->postJson('/api/v1/identity/login', $payload)->assertUnauthorized();
+        }
+
+        $this->postJson('/api/v1/identity/login', [
+            ...$payload,
+            'email' => 'ratelimit@EXAMPLE.com',
+        ])->assertTooManyRequests();
+    }
 }

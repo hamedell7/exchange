@@ -12,13 +12,13 @@ services:
       APP_NAME: wallet
       APP_ENV: ${APP_ENV:-local}
       APP_DEBUG: ${APP_DEBUG:-true}
-      APP_URL: ${APP_URL:-http://localhost:8003}
+      APP_URL: ${APP_URL:-http://localhost:8004}
       LOG_CHANNEL: stderr
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_DATABASE: wallet_db
-      DB_USERNAME: wallet_app
+      DB_DATABASE: ${DB_DATABASE:-wallet_db}
+      DB_USERNAME: ${DB_USERNAME:-wallet_app}
       DB_PASSWORD: ${DB_PASSWORD:-local_wallet_dev}
       CACHE_STORE: database
       SESSION_DRIVER: database
@@ -32,7 +32,7 @@ services:
         source: wallet_vendor
         target: /var/www/html/vendor
     ports:
-      - "127.0.0.1:8003:8000"
+      - "127.0.0.1:8004:8000"
     networks:
       - exchange-network
 

@@ -17,8 +17,8 @@ services:
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_DATABASE: trading_db
-      DB_USERNAME: trading_app
+      DB_DATABASE: ${DB_DATABASE:-trading_db}
+      DB_USERNAME: ${DB_USERNAME:-trading_app}
       DB_PASSWORD: ${DB_PASSWORD:-local_trading_dev}
       CACHE_STORE: database
       SESSION_DRIVER: database

@@ -41,7 +41,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{identityBaseUrl}}/up",
+            "url": "{{identityServiceBaseUrl}}/up",
             "description": "بررسی سلامت اپلیکیشن Identity."
           },
           "event": [
