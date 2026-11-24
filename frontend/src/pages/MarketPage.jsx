@@ -110,12 +110,17 @@ export default function MarketPage() {
         </section>
 
         <section id="markets" className="market-list-section">
-          <div className="market-section-heading"><div><span className="market-section-kicker">LIVE MARKET DATA</span><h2>بازار دارایی‌ها</h2><p>قیمت دارایی‌های فعال به‌ترتیب رتبه بازار</p></div><div className="market-count"><span className="market-count-dot"/>{number.format(total)} دارایی</div></div>
+          <div className="market-section-heading"><div><span className="market-section-kicker">MARKET OVERVIEW</span><h2>بازار دارایی‌ها</h2><p>قیمت دارایی‌ها و تغییرات بازار در یک نگاه</p></div><div className="market-count"><span className="market-count-dot"/>{number.format(total)} دارایی</div></div>
           <div className="market-toolbar"><label className="market-search"><Search size={18}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="جست‌وجوی نام یا نماد دارایی..." aria-label="جست‌وجوی دارایی"/></label><span className="market-source-note">قیمت: CoinMarketCap · نرخ تتر: Nobitex{rateUpdatedAt ? ' · آخرین نرخ: ' + rateUpdatedAt : ''}</span></div>
 
+          <div className="market-table-meta">
+            <div className="market-table-meta-title"><span className="market-table-meta-icon"><BarChart3 size={16}/></span><div><strong>فهرست قیمت‌ها</strong><small>مرتب‌شده بر اساس رتبه بازار</small></div></div>
+            <span className="market-table-results">{assets.length ? `نمایش ${number.format((currentPage - 1) * 50 + 1)} تا ${number.format(Math.min(total, (currentPage - 1) * 50 + assets.length))} از ${number.format(total)} دارایی` : `${number.format(total)} دارایی ثبت‌شده`}</span>
+          </div>
           <div className="market-table-wrap">
-            <table className="market-table">
-              <thead><tr><th>رتبه</th><th>دارایی</th><th>قیمت (USDT)</th><th>قیمت (تومان)</th><th>تغییر ۲۴ ساعت</th><th>اطلاعات</th></tr></thead>
+            <table className="market-table" dir="rtl">
+              <colgroup><col className="market-col-rank"/><col className="market-col-asset"/><col className="market-col-usdt"/><col className="market-col-toman"/><col className="market-col-change"/><col className="market-col-info"/></colgroup>
+              <thead><tr><th scope="col">رتبه</th><th scope="col">نام دارایی</th><th scope="col">قیمت دلاری</th><th scope="col">قیمت تومانی</th><th scope="col">تغییر ۲۴ ساعته</th><th scope="col">وب‌سایت</th></tr></thead>
               <tbody>
                 {loading && assets.length === 0 ? <tr><td colSpan="6"><div className="market-state"><LoaderCircle className="spin" size={23}/> در حال دریافت قیمت‌ها و دارایی‌ها...</div></td></tr>
                   : error && assets.length === 0 ? <tr><td colSpan="6"><div className="market-state market-error"><CircleAlert size={22}/><strong>دریافت اطلاعات انجام نشد</strong><span>{error}</span><button onClick={() => { const controller = new AbortController(); loadAssets(controller.signal); }}>تلاش دوباره</button></div></td></tr>
@@ -131,18 +136,29 @@ export default function MarketPage() {
                         return (
                           <tr key={asset.id}>
                             <td><span className="market-rank">{number.format(asset.rank || 0)}</span></td>
-                            <td><div className="market-asset-cell"><AssetLogo asset={asset}/><div><strong>{asset.name}</strong><small>{asset.slug}</small></div></div></td>
+                            <td>
+                              <div className="market-asset-cell">
+                                <AssetLogo asset={asset}/>
+                                <div className="market-asset-copy"><strong>{asset.name}</strong><span className="market-symbol">{asset.symbol || '—'}</span></div>
+                              </div>
+                            </td>
                             <td><span className="market-price-value">{formatPrice(asset.price_usdt, usdtNumber)} <small>USDT</small></span></td>
-                            <td><span className="market-price-value">{formatPrice(asset.price_toman, tomanNumber)} <small>تومان</small></span></td>
+                            <td><span className="market-price-value market-price-toman">{formatPrice(asset.price_toman, tomanNumber)} <small>تومان</small></span></td>
                             <td><span className={'market-change ' + changeClass}>{formatPercent(change)}</span></td>
-                            <td>{asset.website_url ? <a className="market-info-link" href={asset.website_url} target="_blank" rel="noreferrer">وب‌سایت <ArrowUpLeft size={13}/></a> : <span className="market-muted">—</span>}</td>
+                            <td>{asset.website_url ? <a className="market-info-link" href={asset.website_url} target="_blank" rel="noreferrer">مشاهده <ArrowUpLeft size={13}/></a> : <span className="market-muted">—</span>}</td>
                           </tr>
                         );
                       })}
               </tbody>
             </table>
           </div>
-          <div className="market-pagination"><span>صفحه {number.format(currentPage)} از {number.format(lastPage)}</span><div><button aria-label="صفحه قبل" disabled={loading || currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}><ChevronRight size={18}/></button><button aria-label="صفحه بعد" disabled={loading || currentPage >= lastPage} onClick={() => setPage((value) => value + 1)}><ChevronLeft size={18}/></button></div></div>
+          <div className="market-pagination">
+            <span>صفحه <strong>{number.format(currentPage)}</strong> از {number.format(lastPage)}</span>
+            <div>
+              <button aria-label="صفحه قبل" title="صفحه قبل" disabled={loading || currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}><ChevronRight size={18}/></button>
+              <button aria-label="صفحه بعد" title="صفحه بعد" disabled={loading || currentPage >= lastPage} onClick={() => setPage((value) => value + 1)}><ChevronLeft size={18}/></button>
+            </div>
+          </div>
           <p className="market-disclaimer">قیمت USDT از CoinMarketCap و نرخ تبدیل USDT به تومان از بازار نوبیتکس دریافت می‌شود. اطلاعات قیمت به‌صورت دوره‌ای به‌روزرسانی می‌شود و ممکن است با قیمت قابل معامله در صرافی‌های دیگر تفاوت داشته باشد.</p>
         </section>
 
