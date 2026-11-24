@@ -17,10 +17,10 @@ final class MarketPriceSyncService
     ) {}
 
     /**
-     * Fetch and persist the latest USDT quotes and USDT/Toman conversion rate.
+     * Fetch and persist available USDT quotes and the USDT/Toman conversion rate.
      *
      * @param array<int, MarketAsset> $assets
-     * @return array{count: int, usdt_toman_rate: string}
+     * @return array{count: int, skipped_count: int, usdt_toman_rate: string}
      */
     public function sync(array $assets, bool $dryRun = false): array
     {
@@ -36,37 +36,26 @@ final class MarketPriceSyncService
         $quotesByProviderId = [];
 
         foreach (array_chunk($providerIds, 250) as $batch) {
-            $batchQuotes = $this->coinMarketCap->latestUsdtQuotes($batch);
-
-            foreach ($batchQuotes as $providerId => $quote) {
+            foreach ($this->coinMarketCap->latestUsdtQuotes($batch) as $providerId => $quote) {
                 $quotesByProviderId[(int) $providerId] = $quote;
             }
         }
 
-        $missingIds = array_diff($providerIds, array_keys($quotesByProviderId));
-
-        if ($missingIds !== []) {
-            throw new RuntimeException(
-                'CoinMarketCap did not return quotes for asset IDs: '.implode(',', array_slice($missingIds, 0, 10)),
-            );
-        }
-
-        $exchangeRate = $this->nobitex->latestUsdtTomanRate();
         $now = now();
         $rows = [];
+        $skippedCount = 0;
 
         foreach ($assets as $asset) {
             $providerId = (int) $asset->provider_asset_id;
             $providerQuote = $quotesByProviderId[$providerId]['quote']['USDT'] ?? null;
+            $price = is_array($providerQuote)
+                ? $this->decimal($providerQuote['price'] ?? null, 24)
+                : null;
 
-            if (! is_array($providerQuote)) {
-                throw new RuntimeException("CoinMarketCap did not return a USDT quote for asset ID {$providerId}.");
-            }
-
-            $price = $this->decimal($providerQuote['price'] ?? null, 24);
-
+            // CMC can omit assets with no current quote. Keep syncing the rest.
             if ($price === null || (float) $price <= 0) {
-                throw new RuntimeException("CoinMarketCap returned an invalid USDT price for asset ID {$providerId}.");
+                $skippedCount++;
+                continue;
             }
 
             $sourceUpdatedAt = isset($providerQuote['last_updated'])
@@ -89,6 +78,12 @@ final class MarketPriceSyncService
                 'updated_at' => $now,
             ];
         }
+
+        if ($rows === []) {
+            throw new RuntimeException('CoinMarketCap did not return any valid USDT prices for the requested assets.');
+        }
+
+        $exchangeRate = $this->nobitex->latestUsdtTomanRate();
 
         if (! $dryRun) {
             DB::transaction(function () use ($rows, $exchangeRate, $now): void {
@@ -121,6 +116,7 @@ final class MarketPriceSyncService
 
         return [
             'count' => count($rows),
+            'skipped_count' => $skippedCount,
             'usdt_toman_rate' => $exchangeRate['rate'],
         ];
     }
