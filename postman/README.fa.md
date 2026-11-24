@@ -19,10 +19,11 @@ docker compose --env-file identity-service/.env -f identity-service/compose.yaml
 docker compose --env-file identity-service/.env -f identity-service/compose.yaml exec app php artisan migrate --force
 ```
 
-آدرس مستقیم Identity در محیط محلی: `http://localhost:8001`
+آدرس Gateway در محیط محلی: `http://localhost:8080`؛ درخواست‌های API در Collection از همین مسیر عبور می‌کنند. آدرس مستقیم Identity فقط برای Health Check سرویس استفاده می‌شود: `http://localhost:8001`.
 
-Health check:
-- `GET {{identityBaseUrl}}/up`
+Health checkها:
+- Gateway: `GET {{gatewayBaseUrl}}/healthz`
+- Identity مستقیم: `GET {{identityServiceBaseUrl}}/up`
 
 ## ترتیب تست پیشنهادی
 
