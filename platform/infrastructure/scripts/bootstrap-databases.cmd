@@ -21,6 +21,9 @@ for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
   if "%%A"=="MARKET_DATA_DB_DATABASE" set "MARKET_DATA_DB_DATABASE=%%B"
   if "%%A"=="MARKET_DATA_DB_PASSWORD" set "MARKET_DATA_DB_PASSWORD=%%B"
 )
+if not defined MARKET_DATA_DB_USERNAME set "MARKET_DATA_DB_USERNAME=market_data_app"
+if not defined MARKET_DATA_DB_DATABASE set "MARKET_DATA_DB_DATABASE=market_data_db"
+if not defined MARKET_DATA_DB_PASSWORD set "MARKET_DATA_DB_PASSWORD=local_market_data_dev"
 
 if not defined IDENTITY_DB_USERNAME goto missing_env_value
 if not defined IDENTITY_DB_DATABASE goto missing_env_value
