@@ -25,6 +25,8 @@ services:
       CMC_API_KEY: ${CMC_API_KEY:-}
       CMC_BASE_URL: ${CMC_BASE_URL:-https://pro-api.coinmarketcap.com}
       CMC_HTTP_TIMEOUT: ${CMC_HTTP_TIMEOUT:-30}
+      NOBITEX_BASE_URL: ${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
+      NOBITEX_HTTP_TIMEOUT: ${NOBITEX_HTTP_TIMEOUT:-15}
     volumes:
       - type: bind
         source: .
@@ -36,6 +38,45 @@ services:
       - "127.0.0.1:8003:8000"
     networks:
       - exchange-network
+
+  scheduler:
+    image: exchange-market-data:local
+    container_name: market-data-scheduler
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      - app
+    environment:
+      APP_NAME: market-data
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-http://localhost:8003}
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-market_data_db}
+      DB_USERNAME: ${DB_USERNAME:-market_data_app}
+      DB_PASSWORD: ${DB_PASSWORD:-local_market_data_dev}
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: database
+      CMC_API_KEY: ${CMC_API_KEY:-}
+      CMC_BASE_URL: ${CMC_BASE_URL:-https://pro-api.coinmarketcap.com}
+      CMC_HTTP_TIMEOUT: ${CMC_HTTP_TIMEOUT:-30}
+      NOBITEX_BASE_URL: ${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
+      NOBITEX_HTTP_TIMEOUT: ${NOBITEX_HTTP_TIMEOUT:-15}
+    volumes:
+      - type: bind
+        source: .
+        target: /var/www/html
+      - type: volume
+        source: market_data_vendor
+        target: /var/www/html/vendor
+    networks:
+      - exchange-network
+
 volumes:
   market_data_vendor:
 networks:

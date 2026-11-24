@@ -19,4 +19,8 @@ return [
         'base_url' => env('CMC_BASE_URL', 'https://pro-api.coinmarketcap.com'),
         'timeout' => (int) env('CMC_HTTP_TIMEOUT', 30),
     ],
+    'nobitex' => [
+        'base_url' => env('NOBITEX_BASE_URL', 'https://apiv2.nobitex.ir'),
+        'timeout' => (int) env('NOBITEX_HTTP_TIMEOUT', 15),
+    ],
 ];

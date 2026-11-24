@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class MarketAsset extends Model
 {
@@ -23,5 +24,10 @@ final class MarketAsset extends Model
             'date_added' => 'immutable_datetime',
             'metadata_synced_at' => 'immutable_datetime',
         ];
+    }
+
+    public function quote(): HasOne
+    {
+        return $this->hasOne(MarketAssetQuote::class);
     }
 }
