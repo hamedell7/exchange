@@ -18,6 +18,16 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        RateLimiter::for('identity-login', function (Request $request): array {
+            $email = strtolower(trim((string) $request->input('email', '')));
+            $emailKey = hash('sha256', $email);
+
+            return [
+                Limit::perMinute(10)->by('identity-login:ip:'.$request->ip()),
+                Limit::perMinute(5)->by('identity-login:email:'.$emailKey),
+            ];
+        });
+
         RateLimiter::for('identity-email-actions', function (Request $request): array {
             $email = strtolower(trim((string) $request->input('email', '')));
             $emailKey = $email === '' ? $request->ip() : hash('sha256', $email);

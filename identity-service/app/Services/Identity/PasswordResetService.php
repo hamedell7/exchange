@@ -60,6 +60,9 @@ final class PasswordResetService
             $user->forceFill([
                 'password' => Hash::make($plainPassword),
             ])->save();
+
+            // Password reset invalidates every previously issued access token.
+            $user->tokens()->delete();
         });
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Identity;
 
-use App\Mail\Identity\EmailVerificationMail;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,7 +22,7 @@ final class RegistrationTest extends TestCase
         Mail::fake();
     }
 
-    public function test_user_can_register_through_the_identity_api(): void
+    public function test_user_can_register_and_sign_in_without_email_verification(): void
     {
         $response = $this->postJson('/api/v1/identity/register', [
             'name' => 'Alice Example',
@@ -36,7 +35,7 @@ final class RegistrationTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.name', 'Alice Example')
             ->assertJsonPath('data.email', 'Alice@example.com')
-            ->assertJsonPath('data.status', 'pending_verification')
+            ->assertJsonPath('data.status', 'active')
             ->assertJsonPath('data.email_verified_at', null)
             ->assertJsonStructure(['data' => [
                 'id', 'name', 'email', 'status', 'email_verified_at', 'registered_at',
@@ -45,8 +44,12 @@ final class RegistrationTest extends TestCase
         $this->assertDatabaseHas('users', [
             'email' => 'Alice@example.com',
             'email_normalized' => 'alice@example.com',
-            'status' => 'pending_verification',
+            'status' => 'active',
             'email_verified_at' => null,
+        ]);
+
+        $this->assertDatabaseMissing('identity_action_tokens', [
+            'purpose' => 'verify_email',
         ]);
 
         $user = User::query()->where('email', 'Alice@example.com')->firstOrFail();
@@ -56,7 +59,12 @@ final class RegistrationTest extends TestCase
         self::assertSame(26, strlen($user->id));
         self::assertArrayNotHasKey('password', $response->json('data'));
         self::assertArrayNotHasKey('email_normalized', $user->toArray());
-        Mail::assertSent(EmailVerificationMail::class);
+        Mail::assertNothingSent();
+
+        $this->postJson('/api/v1/identity/login', [
+            'email' => 'alice@EXAMPLE.com',
+            'password' => 'correct-horse-battery-staple',
+        ])->assertOk()->assertJsonPath('data.user.id', $user->id);
     }
 
     public function test_email_identity_is_case_insensitive_and_duplicate_returns_conflict(): void

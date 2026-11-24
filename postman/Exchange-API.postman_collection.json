@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d3e9f1c8-31a1-4d2b-9b8f-identity000001",
     "name": "Exchange API - Local Development",
-    "description": "مجموعه تست APIهای پیاده‌سازی‌شده Exchange شامل Health، ثبت‌نام و فهرست امن کاربران Identity.",
+    "description": "مجموعه تست APIهای Exchange شامل ثبت‌نام، ورود با Sanctum، خروج، پروفایل احرازشده و فهرست امن کاربران Identity.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -18,6 +18,11 @@
     },
     {
       "key": "identityAdminReadToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "identityAccessToken",
       "value": "",
       "type": "string"
     }
@@ -76,7 +81,7 @@
               }
             },
             "url": "{{identityBaseUrl}}/api/v1/identity/register",
-            "description": "ثبت‌نام کاربر آزمایشی. ایمیل به‌صورت خودکار برای اجرای اول ساخته و در Collection Variable نگهداری می‌شود."
+            "description": "ثبت‌نام کاربر آزمایشی. حساب بلافاصله active می‌شود و تأیید ایمیل لازم نیست."
           },
           "event": [
             {
@@ -101,6 +106,8 @@
                   "  const body = pm.response.json();",
                   "  pm.expect(body).to.have.property('data');",
                   "  pm.expect(body.data).to.have.property('id').that.is.a('string').and.not.empty;",
+                  "  pm.expect(body.data.status).to.eql('active');",
+                  "  pm.expect(body.data.email_verified_at).to.eql(null);",
                   "  pm.expect(body.data.name).to.eql('Postman Test User');",
                   "  pm.expect(body.data.email).to.eql(pm.collectionVariables.get('registrationEmail'));",
                   "  pm.expect(body.data).to.have.property('registered_at');",
@@ -112,7 +119,7 @@
           ]
         },
         {
-          "name": "Register Duplicate Email (expect 422)",
+          "name": "Register Duplicate Email (expect 409)",
           "request": {
             "method": "POST",
             "header": [
@@ -135,7 +142,7 @@
               }
             },
             "url": "{{identityBaseUrl}}/api/v1/identity/register",
-            "description": "پس از اجرای موفق Register User اجرا شود؛ همان ایمیل باید به‌عنوان تکراری رد شود."
+            "description": "پس از اجرای موفق Register User اجرا شود؛ همان ایمیل باید با تعارض 409 رد شود."
           },
           "event": [
             {
@@ -143,7 +150,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 422 Unprocessable Entity', function () { pm.response.to.have.status(422); });",
+                  "pm.test('HTTP 409 Conflict', function () { pm.response.to.have.status(409); });",
                   "pm.test('Email validation error is returned', function () {",
                   "  const body = pm.response.json();",
                   "  pm.expect(body).to.have.property('errors');",
@@ -233,6 +240,166 @@
                   "    pm.expect(body.data[0]).not.to.have.property('email_normalized');",
                   "  }",
                   "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (email + password)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"{{registrationPassword}}\",\n  \"device_name\": \"Postman Local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{identityBaseUrl}}/api/v1/identity/login",
+            "description": "ورود با ایمیل و رمز عبور؛ تأیید ایمیل لازم نیست. توکن Sanctum به‌صورت خودکار در متغیر identityAccessToken ذخیره می‌شود."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Sanctum Bearer token returned', function () {",
+                  "  pm.expect(body.data.token_type).to.eql('Bearer');",
+                  "  pm.expect(body.data.access_token).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.expires_at).to.be.a('string');",
+                  "  pm.expect(body.data.user).to.have.property('id');",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('identityAccessToken', body.data.access_token);",
+                  "  pm.collectionVariables.set('authenticatedUserId', body.data.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login With Wrong Password (expect 401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"this-is-not-the-correct-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{identityBaseUrl}}/api/v1/identity/login",
+            "description": "تست ورود ناموفق؛ پاسخ برای ایمیل ناشناخته و رمز اشتباه یکسان است."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401 Unauthorized', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Generic credentials error', function () {",
+                  "  pm.expect(pm.response.json().message).to.eql('The provided credentials are incorrect.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Current User (Bearer)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{identityAccessToken}}"
+              }
+            ],
+            "url": "{{identityBaseUrl}}/api/v1/identity/me",
+            "description": "دریافت حساب جاری با Bearer Token ذخیره‌شده توسط درخواست Login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Current user matches login', function () {",
+                  "  pm.expect(body.data.id).to.eql(pm.collectionVariables.get('authenticatedUserId'));",
+                  "  pm.expect(body.data).not.to.have.property('password');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout (revoke current token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{identityAccessToken}}"
+              }
+            ],
+            "url": "{{identityBaseUrl}}/api/v1/identity/logout",
+            "description": "باطل‌کردن توکن فعلی. فقط همان توکن جاری حذف می‌شود؛ درخواست Login را برای دریافت توکن تازه دوباره اجرا کنید."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Logout confirmation', function () {",
+                  "  pm.expect(pm.response.json().message).to.eql('You have been signed out.');",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.unset('identityAccessToken');",
+                  "  pm.collectionVariables.unset('authenticatedUserId');",
+                  "}"
                 ]
               }
             }

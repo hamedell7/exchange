@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Identity;
 
-use App\Enums\Identity\AccountAction;
 use App\Enums\Identity\UserStatus;
 use App\Exceptions\Identity\EmailAlreadyRegistered;
 use App\Models\User;
@@ -16,12 +15,6 @@ use Illuminate\Validation\ValidationException;
 
 final class UserRegistrationService
 {
-    public function __construct(
-        private readonly AccountActionTokenService $tokens,
-        private readonly IdentityMailService $mail,
-    ) {
-    }
-
     public function register(string $name, string $email, string $plainPassword): User
     {
         $name = trim($name);
@@ -46,23 +39,18 @@ final class UserRegistrationService
         $email = substr($email, 0, $separator).'@'.strtolower(substr($email, $separator + 1));
 
         try {
-            [$user, $plainToken] = DB::transaction(function () use ($name, $email, $plainPassword): array {
+            return DB::transaction(function () use ($name, $email, $plainPassword): User {
                 $user = new User();
                 $user->forceFill([
                     'name' => $name,
                     'email' => $email,
                     'password' => Hash::make($plainPassword),
-                    'status' => UserStatus::PendingVerification,
+                    // Email verification is currently optional; new accounts can sign in immediately.
+                    'status' => UserStatus::Active,
                 ]);
                 $user->save();
 
-                $plainToken = $this->tokens->issue(
-                    (string) $user->getKey(),
-                    AccountAction::VerifyEmail,
-                    60,
-                );
-
-                return [$user, $plainToken];
+                return $user;
             });
         } catch (QueryException $exception) {
             if ($this->isEmailIdentityUniqueViolation($exception)) {
@@ -71,11 +59,6 @@ final class UserRegistrationService
 
             throw $exception;
         }
-
-        // Send only after the account and its one-time token have committed.
-        $this->mail->sendEmailVerification((string) $user->email, $plainToken);
-
-        return $user;
     }
 
     private function isEmailIdentityUniqueViolation(QueryException $exception): bool

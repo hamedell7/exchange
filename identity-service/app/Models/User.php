@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * Identity user record. Laravel's Eloquent model is used directly by the
@@ -25,7 +26,7 @@ class User extends Authenticatable
     public const MAX_NAME_LENGTH = 255;
 
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUlids, Notifiable;
+    use HasApiTokens, HasFactory, HasUlids, Notifiable;
 
     public $incrementing = false;
 

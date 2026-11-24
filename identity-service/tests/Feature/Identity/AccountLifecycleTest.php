@@ -23,14 +23,16 @@ final class AccountLifecycleTest extends TestCase
         Mail::fake();
     }
 
-    public function test_email_verification_activates_the_account_and_token_is_single_use(): void
+    public function test_legacy_pending_account_can_still_verify_email_with_a_single_use_token(): void
     {
-        $this->postJson('/api/v1/identity/register', [
+        User::factory()->unverified()->create([
             'name' => 'Alice Example',
             'email' => 'alice@example.com',
-            'password' => 'correct-horse-battery-staple',
-            'password_confirmation' => 'correct-horse-battery-staple',
-        ])->assertCreated();
+        ]);
+
+        $this->postJson('/api/v1/identity/email/verification/resend', [
+            'email' => 'alice@example.com',
+        ])->assertAccepted();
 
         $token = null;
         Mail::assertSent(EmailVerificationMail::class, function (EmailVerificationMail $mail) use (&$token): bool {
@@ -78,6 +80,7 @@ final class AccountLifecycleTest extends TestCase
             'password' => Hash::make('old-password-is-long-enough'),
             'status' => 'active',
         ]);
+        $user->createToken('old-device');
 
         $this->postJson('/api/v1/identity/password/forgot', [
             'email' => 'Alice@EXAMPLE.com',
@@ -111,6 +114,9 @@ final class AccountLifecycleTest extends TestCase
         $this->assertDatabaseMissing('identity_action_tokens', [
             'purpose' => 'reset_password',
             'consumed_at' => null,
+        ]);
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'tokenable_id' => $user->getKey(),
         ]);
 
         $this->postJson('/api/v1/identity/password/reset', [

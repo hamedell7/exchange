@@ -23,6 +23,16 @@ Services may use Eloquent, DB transactions, Hash, Mail, Str and other Laravel fa
 
 Create one service per cohesive capability, not one class per method. Keep controllers thin. Keep API output explicit through Resources even though the services use Eloquent models.
 
+## Authentication
+
+- API authentication uses Laravel Sanctum personal access tokens.
+- Login is `POST /api/v1/identity/login` with email/password and an optional device_name.
+- Tokens are opaque, SHA-256 hashed in the database, expire after 30 days by default, and are sent as `Authorization: Bearer <token>`.
+- `GET /api/v1/identity/me` returns the token owner. `POST /api/v1/identity/logout` revokes only the presented token.
+- Email verification is currently optional. New registrations are active immediately; legacy pending-verification accounts can also sign in.
+- Suspended and closed accounts cannot sign in. Resetting a password revokes all existing access tokens.
+- Sanctum tokens currently authenticate Identity endpoints only. Do not assume Gateway, Wallet or Trading validates them until a cross-service token contract is implemented.
+
 ## Avoid unnecessary architecture
 
 Do not add these by default:
@@ -44,10 +54,10 @@ Use focused helper classes only where a rule or operation is genuinely shared. U
 - Other services may keep only the opaque Identity user ID; they must not import this service's model or query its database.
 - Email identity is case-insensitive. Preserve the local-part casing; lowercase the domain. The generated `email_normalized` column and named unique index are the final uniqueness authority.
 - Passwords use Argon2id. Keep the 15–128 Unicode code-point rule consistent in registration and password reset. Do not add composition rules.
-- Email verification and reset tokens contain 256 bits of randomness. Persist only SHA-256 hashes; enforce purpose, expiry and single use.
-- Token consumption and account-state/password changes must share one DB transaction. Issuing a replacement token invalidates the previous outstanding token for the same user and purpose.
-- Send mail only after the database transaction commits. Never log an email address, token or link on delivery failure.
-- Forgot-password and resend-verification responses must not disclose whether an account exists.
+- Legacy email-verification and password-reset tokens contain 256 bits of randomness. Persist only SHA-256 hashes; enforce purpose, expiry and single use.
+- Token consumption and account-state/password changes must share one DB transaction. Issuing a replacement action token invalidates the previous outstanding token for the same user and purpose.
+- Send password-reset mail only after the database transaction commits. Never log an email address, token or link on delivery failure.
+- Forgot-password and legacy resend-verification responses must not disclose whether an account exists.
 - `GET /api/v1/identity/users` is server-to-server only. Require `X-Identity-Admin-Token`, fail closed when it is not configured, validate it as 64 lowercase hex characters and compare with `hash_equals`. Never put this credential in browser code or a public Postman environment. It is not per-user RBAC.
 
 ## Working conventions
@@ -63,4 +73,5 @@ Use focused helper classes only where a rule or operation is genuinely shared. U
 Run from `identity-service/`:
 
     composer install
+    php artisan migrate
     php artisan test

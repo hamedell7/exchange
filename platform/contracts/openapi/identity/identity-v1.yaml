@@ -5,7 +5,7 @@ info:
   description: |
     Public HTTP contract for Identity service version 1.
     Email casing is preserved in the stored/display address, while account identity is case-insensitive.
-    New registrations remain pending until their email address is verified.
+    New registrations are active immediately; email verification is currently optional. Legacy pending accounts may still use the verification endpoints.
     Passwords are 15 to 128 Unicode code points and are hashed with Argon2id.
 servers:
   - url: http://localhost:8080
@@ -13,13 +13,97 @@ servers:
 tags:
   - name: Identity
 paths:
+  /api/v1/identity/login:
+    post:
+      tags: [Identity]
+      operationId: loginIdentityUser
+      summary: Sign in with email and password
+      description: |
+        Authenticates an enabled account without requiring email verification and issues a 30-day Sanctum personal access token.
+        Suspended and closed accounts cannot sign in. Pending accounts created before the optional-verification change may sign in.
+        Rate limited by caller IP and normalized email identity.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: alice@example.com
+              password: correct-horse-battery-staple
+              device_name: Web Browser
+      responses:
+        '200':
+          description: Credentials accepted and a Bearer token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Email or password is incorrect, or the account is disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+        '422':
+          description: Request fields failed validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/v1/identity/me:
+    get:
+      tags: [Identity]
+      operationId: getCurrentIdentityUser
+      summary: Get the authenticated user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Authenticated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResourceResponse'
+        '401':
+          description: Missing, expired, revoked or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+
+  /api/v1/identity/logout:
+    post:
+      tags: [Identity]
+      operationId: logoutIdentityUser
+      summary: Revoke the current access token
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current access token revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+        '401':
+          description: Missing, expired, revoked or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+
   /api/v1/identity/register:
     post:
       tags: [Identity]
       operationId: registerIdentityUser
       summary: Register a new Identity account
       description: |
-        Creates a pending account and attempts to deliver a single-use email-verification link.
+        Creates an active account immediately. Email verification is currently not required for sign-in.
         Rate limited to 10 requests per minute per caller.
         Email addresses that differ only by letter casing represent the same account identity.
       security: []
@@ -36,7 +120,7 @@ paths:
               password_confirmation: correct-horse-battery-staple
       responses:
         '201':
-          description: Pending account created; verification email delivery attempted
+          description: Active account created; email verification is not required
           content:
             application/json:
               schema:
@@ -62,6 +146,7 @@ paths:
     post:
       tags: [Identity]
       operationId: verifyIdentityEmail
+      deprecated: true
       summary: Verify an email address
       description: Consumes a single-use verification token and activates the pending account.
       security: []
@@ -91,6 +176,7 @@ paths:
     post:
       tags: [Identity]
       operationId: resendIdentityEmailVerification
+      deprecated: true
       summary: Request another email-verification link
       description: Always returns the same response for unknown, active, or pending accounts to prevent account enumeration.
       security: []
@@ -242,6 +328,10 @@ paths:
 
 components:
   securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
     IdentityAdminToken:
       type: apiKey
       in: header
@@ -292,6 +382,43 @@ components:
             last_page:
               type: integer
               minimum: 1
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          maxLength: 128
+        device_name:
+          type: string
+          maxLength: 100
+          description: Optional label used to identify this device when revoking tokens.
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [token_type, access_token, expires_at, user]
+          properties:
+            token_type:
+              type: string
+              enum: [Bearer]
+            access_token:
+              type: string
+              description: Plain-text Sanctum token; shown only once. Store securely and send in the Authorization Bearer header.
+            expires_at:
+              type: string
+              format: date-time
+            user:
+              $ref: '#/components/schemas/UserResource'
     RegisterUserRequest:
       type: object
       additionalProperties: false
