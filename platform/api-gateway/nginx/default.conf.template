@@ -8,16 +8,12 @@ server {
     listen 8080;
     server_name _;
     server_tokens off;
-
-    # Docker embedded DNS. Resolve service names at request time so the Gateway
-    # can start before the independently managed Laravel containers.
     resolver 127.0.0.11 ipv6=off valid=10s;
 
     client_max_body_size 1m;
     client_body_timeout 15s;
     client_header_timeout 15s;
     send_timeout 30s;
-
     limit_conn conn_per_ip 30;
 
     add_header X-Content-Type-Options nosniff always;
@@ -25,7 +21,7 @@ server {
     add_header X-Request-ID $request_id always;
 
     access_log /var/log/nginx/access.log;
-    error_log  /var/log/nginx/error.log warn;
+    error_log /var/log/nginx/error.log warn;
 
     location = /healthz {
         access_log off;
@@ -43,12 +39,10 @@ server {
         return 404 '{"error":{"code":"route_not_found","message":"Route not found"}}';
     }
 
-    # Identity owns authentication, credentials, sessions and identity permissions.
     location ^~ /api/v1/identity/ {
         set $identity_backend ${IDENTITY_SERVICE_HOST}:${IDENTITY_SERVICE_PORT};
         limit_req zone=api_per_ip burst=40 nodelay;
         limit_req_status 429;
-
         proxy_pass http://$identity_backend;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
@@ -57,18 +51,15 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Request-ID $request_id;
-
         proxy_connect_timeout 3s;
         proxy_send_timeout 15s;
         proxy_read_timeout 30s;
     }
 
-    # Trading owns markets, orders and executions.
     location ^~ /api/v1/trading/ {
         set $trading_backend ${TRADING_SERVICE_HOST}:${TRADING_SERVICE_PORT};
         limit_req zone=api_per_ip burst=40 nodelay;
         limit_req_status 429;
-
         proxy_pass http://$trading_backend;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
@@ -77,18 +68,15 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Request-ID $request_id;
-
         proxy_connect_timeout 3s;
         proxy_send_timeout 15s;
         proxy_read_timeout 30s;
     }
 
-    # Wallet owns balances, ledger entries, holds and transfers.
     location ^~ /api/v1/wallet/ {
         set $wallet_backend ${WALLET_SERVICE_HOST}:${WALLET_SERVICE_PORT};
         limit_req zone=api_per_ip burst=40 nodelay;
         limit_req_status 429;
-
         proxy_pass http://$wallet_backend;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
@@ -97,7 +85,24 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Request-ID $request_id;
+        proxy_connect_timeout 3s;
+        proxy_send_timeout 15s;
+        proxy_read_timeout 30s;
+    }
 
+    # Public global asset catalog. Keep the URI unchanged for the Laravel route.
+    location ^~ /api/v1/market/ {
+        set $market_data_backend ${MARKET_DATA_SERVICE_HOST}:${MARKET_DATA_SERVICE_PORT};
+        limit_req zone=api_per_ip burst=60 nodelay;
+        limit_req_status 429;
+        proxy_pass http://$market_data_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-ID $request_id;
         proxy_connect_timeout 3s;
         proxy_send_timeout 15s;
         proxy_read_timeout 30s;

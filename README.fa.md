@@ -1,6 +1,6 @@
 # Exchange Platform
 
-این مخزن یک **Monorepo با مرزهای اجرایی مستقل** است. هر Microservice چرخه اجرای Docker، تنظیمات محیطی، وابستگی‌ها و دیتابیس خودش را دارد؛ اجزای مشترک پلتفرم هم زیر platform/ نگهداری می‌شوند.
+این مخزن یک Monorepo با مرزهای اجرایی مستقل است. هر Microservice چرخه اجرای Docker، تنظیمات محیطی، وابستگی‌ها و دیتابیس خودش را دارد؛ اجزای مشترک پلتفرم هم زیر platform/ نگهداری می‌شوند.
 
 ## ساختار مخزن
 
@@ -9,74 +9,66 @@
     ├── identity-service/       # Laravel Identity service
     ├── wallet-service/         # Laravel Wallet service
     ├── trading-service/        # Laravel Trading service
+    ├── market-data-service/    # Laravel global market asset catalog
     └── platform/
-        ├── api-gateway/         # Nginx API Gateway
-        ├── infrastructure/     # PostgreSQL, Redis, RabbitMQ و شبکه مشترک
-        ├── contracts/           # OpenAPI و Integration Event contracts
-        └── docs/                # معماری، ADRها و Runbookها
+        ├── api-gateway/        # Nginx API Gateway
+        ├── infrastructure/    # PostgreSQL, Redis, RabbitMQ, Adminer
+        ├── contracts/          # OpenAPI و Integration Event contracts
+        └── docs/               # معماری، ADRها و Runbookها
 
 ## Frontend یکپارچه
 
-پروژه React در پوشه مستقل `frontend/` قرار دارد و رابط کاربری مشترک Identity، Wallet و Trading خواهد بود. این پروژه به کد داخلی Laravel وابسته نیست و درخواست‌ها را فقط از مسیر API Gateway ارسال می‌کند.
+پروژه React در پوشه مستقل frontend/ قرار دارد و رابط کاربری مشترک سرویس‌ها خواهد بود. درخواست‌ها فقط از مسیر API Gateway ارسال می‌شوند.
 
-راهنمای اجرا و تنظیمات فرانت‌اند: [frontend/README.md](frontend/README.md)
+راهنما: frontend/README.md
 
 ## قراردادهای معماری و توسعه
 
-- [قراردادهای توسعه Exchange](platform/docs/architecture/development-contracts.fa.md)
-- [راهنمای معماری Service-Based](platform/docs/architecture/service-based-architecture.md)
-- [مرزبندی سرویس‌ها](platform/docs/architecture/service-boundaries.md)
-- [قراردادهای عمومی API و Event](platform/contracts/README.fa.md)
+- platform/docs/architecture/development-contracts.fa.md
+- platform/docs/architecture/service-based-architecture.md
+- platform/docs/architecture/service-boundaries.md
+- platform/contracts/README.fa.md
 
-ساختار داخلی Laravel بر پایه Controller، Form Request، Service و Eloquent Model است. مرزهای مالکیت داده و ارتباط مستقل Microserviceها همچنان حفظ می‌شوند. پیش از اضافه‌کردن abstraction جدید، راهنمای معماری را بررسی کنید.
+ساختار داخلی Laravel بر پایه Controller، Form Request، Service و Eloquent Model است. از اضافه‌کردن abstraction بدون نیاز واقعی پرهیز کنید.
 
-## مرزهای Docker در توسعه محلی
+## راه‌اندازی Market Data در Windows PowerShell
 
-- هر Laravel service با Compose مستقل اجرا می‌شود.
-- فرانت‌اند React مستقل است و در زمان توسعه با Vite اجرا می‌شود.
-- درخواست‌های `/api/*` در Vite به API Gateway محلی روی پورت 8080 پروکسی می‌شوند.
-- سورس هر سرویس به‌صورت Bind Mount از پوشه همان سرویس به /var/www/html متصل است؛ ویرایش فایل‌ها روی Host بلافاصله داخل کانتینر دیده می‌شود.
-- پوشه vendor هر سرویس Named Volume مستقل دارد تا Composer dependencyهای Linux با فایل‌های Host ویندوز مخلوط نشوند.
-- دیتابیس هر سرویس و داده‌های زیرساخت در Named Volumeهای مستقل نگهداری می‌شوند.
-- زیرساخت مالک شبکه مشترک با نام ثابت exchange-network است. سرویس‌ها و Gateway آن را مصرف می‌کنند؛ شبکه را دستی نسازید.
-- Bind Mount سورس فقط برای Development است. Production باید از Image ساخته‌شده و بدون Mount سورس استفاده کند.
-
-## راه‌اندازی در Windows PowerShell
-
-ابتدا فایل‌های محیطی را فقط در صورت نبودن ایجاد کنید:
+ابتدا فایل‌های محیطی را در صورت نبودن ایجاد کن:
 
     if (-not (Test-Path .\platform\infrastructure\.env)) {
         Copy-Item .\platform\infrastructure\.env.example .\platform\infrastructure\.env
     }
-    if (-not (Test-Path .\identity-service\.env)) {
-        Copy-Item .\identity-service\.env.example .\identity-service\.env
-    }
-    if (-not (Test-Path .\wallet-service\.env)) {
-        Copy-Item .\wallet-service\.env.example .\wallet-service\.env
-    }
-    if (-not (Test-Path .\trading-service\.env)) {
-        Copy-Item .\trading-service\.env.example .\trading-service\.env
+    if (-not (Test-Path .\market-data-service\.env)) {
+        Copy-Item .\market-data-service\.env.example .\market-data-service\.env
     }
 
-Platform را اجرا کنید:
+مقدار CMC_API_KEY را در market-data-service/.env قرار بده. سپس زیرساخت و دیتابیس‌های اختصاصی را آماده کن:
 
     docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d --build
+    platform\infrastructure\scripts\bootstrap-databases.cmd
 
-سپس هر سرویس Laravel را مستقل Build و اجرا کنید. برای نمونه:
+سرویس Market Data را بساز و Migrationها را اجرا کن:
 
-    docker compose --env-file identity-service/.env -f identity-service/compose.yaml up -d --build
-    docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml up -d --build
-    docker compose --env-file trading-service/.env -f trading-service/compose.yaml up -d --build
+    docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml up -d --build
+    docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml exec app php artisan key:generate
+    docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml exec app php artisan migrate --force
+    docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml exec app php artisan market:sync-assets --limit=250
 
-برای اجرای فرانت‌اند از ریشه مخزن:
+راهنمای کامل: market-data-service/README.md
 
-    cd frontend
-    Copy-Item .env.example .env
-    npm install
-    npm run dev
+## ابزارهای محلی
 
-سپس `http://localhost:5173` را باز کنید. درخواست‌های API از طریق Gateway در `http://localhost:8080` ارسال می‌شوند.
+- API Gateway: http://localhost:8080
+- React/Vite: http://localhost:5173
+- Adminer: http://127.0.0.1:8081
 
-## نگهداری داده‌ها
+Adminer فقط روی loopback منتشر می‌شود و برای مشاهده دیتابیس‌های مستقل سرویس‌ها از طریق PostgreSQL مرکزی استفاده می‌شود.
 
-دستور docker compose down کانتینرها را متوقف و حذف می‌کند اما Named Volumeها را نگه می‌دارد. از down -v فقط زمانی استفاده کنید که عمداً قصد حذف داده دیتابیس و وابستگی‌ها را دارید.
+## مرزهای Docker و داده‌ها
+
+- هر Laravel service با Compose مستقل اجرا می‌شود.
+- زیرساخت مالک شبکه مشترک exchange-network است؛ آن را دستی ایجاد نکنید.
+- هر سرویس دیتابیس و Role اختصاصی دارد.
+- ارتباط سرویس‌ها از API یا Event است، نه Query مستقیم به دیتابیس سرویس دیگر.
+- از docker compose down -v برای خاموش کردن معمولی زیرساخت استفاده نکنید.
+- Secretهای Production نباید در Git ثبت شوند.

@@ -63,6 +63,19 @@ services:
     networks:
       - exchange-network
 
+  adminer:
+    image: adminer:5
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - exchange-network
+
   api-gateway:
     build:
       context: ../api-gateway
@@ -77,6 +90,8 @@ services:
       TRADING_SERVICE_PORT: ${TRADING_SERVICE_PORT:-8000}
       WALLET_SERVICE_HOST: ${WALLET_SERVICE_HOST:-wallet-service}
       WALLET_SERVICE_PORT: ${WALLET_SERVICE_PORT:-8000}
+      MARKET_DATA_SERVICE_HOST: ${MARKET_DATA_SERVICE_HOST:-market-data-service}
+      MARKET_DATA_SERVICE_PORT: ${MARKET_DATA_SERVICE_PORT:-8000}
     ports:
       - "127.0.0.1:${API_GATEWAY_PORT:-8080}:8080"
     networks:
