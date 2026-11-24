@@ -22,7 +22,7 @@ docker compose --env-file platform/infrastructure/.env -f platform/infrastructur
 platform\infrastructure\scripts\bootstrap-databases.cmd
 ```
 
-The bootstrap command creates the three isolated databases and login roles on the shared PostgreSQL server. Keep the WALLET_DB_PASSWORD in the infrastructure `.env` equal to `DB_PASSWORD` in `wallet-service/.env` (the example values already match).
+The bootstrap command creates the four isolated databases and login roles on the shared PostgreSQL server. Keep the WALLET_DB_PASSWORD in the infrastructure `.env` equal to `DB_PASSWORD` in `wallet-service/.env` (the example values already match).
 
 Build and start Wallet, generate its key, and run migrations:
 
