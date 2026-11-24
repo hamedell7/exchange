@@ -4,25 +4,14 @@
 limit_req_zone $binary_remote_addr zone=api_per_ip:10m rate=20r/s;
 limit_conn_zone $binary_remote_addr zone=conn_per_ip:10m;
 
-upstream identity_backend {
-    server ${IDENTITY_SERVICE_HOST}:${IDENTITY_SERVICE_PORT};
-    keepalive 32;
-}
-
-upstream trading_backend {
-    server ${TRADING_SERVICE_HOST}:${TRADING_SERVICE_PORT};
-    keepalive 32;
-}
-
-upstream wallet_backend {
-    server ${WALLET_SERVICE_HOST}:${WALLET_SERVICE_PORT};
-    keepalive 32;
-}
-
 server {
     listen 8080;
     server_name _;
     server_tokens off;
+
+    # Docker embedded DNS. Resolve service names at request time so the Gateway
+    # can start before the independently managed Laravel containers.
+    resolver 127.0.0.11 ipv6=off valid=10s;
 
     client_max_body_size 1m;
     client_body_timeout 15s;
@@ -56,10 +45,11 @@ server {
 
     # Identity owns authentication, credentials, sessions and identity permissions.
     location ^~ /api/v1/identity/ {
+        set $identity_backend ${IDENTITY_SERVICE_HOST}:${IDENTITY_SERVICE_PORT};
         limit_req zone=api_per_ip burst=40 nodelay;
         limit_req_status 429;
 
-        proxy_pass http://identity_backend;
+        proxy_pass http://$identity_backend;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
         proxy_set_header Host $host;
@@ -75,10 +65,11 @@ server {
 
     # Trading owns markets, orders and executions.
     location ^~ /api/v1/trading/ {
+        set $trading_backend ${TRADING_SERVICE_HOST}:${TRADING_SERVICE_PORT};
         limit_req zone=api_per_ip burst=40 nodelay;
         limit_req_status 429;
 
-        proxy_pass http://trading_backend;
+        proxy_pass http://$trading_backend;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
         proxy_set_header Host $host;
@@ -94,10 +85,11 @@ server {
 
     # Wallet owns balances, ledger entries, holds and transfers.
     location ^~ /api/v1/wallet/ {
+        set $wallet_backend ${WALLET_SERVICE_HOST}:${WALLET_SERVICE_PORT};
         limit_req zone=api_per_ip burst=40 nodelay;
         limit_req_status 429;
 
-        proxy_pass http://wallet_backend;
+        proxy_pass http://$wallet_backend;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
         proxy_set_header Host $host;

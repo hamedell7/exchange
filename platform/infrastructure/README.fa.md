@@ -1,25 +1,30 @@
-# Exchange Infrastructure (Development)
+# Exchange Platform (Development)
 
-این بخش زیرساخت محلی توسعه را مدیریت می‌کند. فعلاً PostgreSQL، Redis و RabbitMQ را اجرا می‌کند؛ سرویس‌های Laravel و API Gateway در این Compose قرار ندارند.
+این Compose نقطه ورود واحد Platform برای توسعه محلی است و اجزای مشترک زیر را اجرا می‌کند:
 
-## پیش‌نیاز
+- PostgreSQL مرکزی
+- Redis
+- RabbitMQ
+- API Gateway مبتنی بر Nginx
 
-- Docker Desktop روشن باشد.
-- Docker Compose v2 در دسترس باشد.
+سه اپلیکیشن Laravel یعنی Identity، Wallet و Trading همچنان Compose مستقل خودشان را دارند و فقط از شبکه مشترک `exchange-network` استفاده می‌کنند.
 
-## راه‌اندازی تازه
+## پیش‌نیاز و راه‌اندازی
 
-از PowerShell یا CMD در ریشه مخزن:
+Docker Desktop و Docker Compose v2 باید فعال باشند. از ریشه مخزن در PowerShell اجرا کن:
 
 ```powershell
 if (-not (Test-Path .\platform\infrastructure\.env)) {
     Copy-Item .\platform\infrastructure\.env.example .\platform\infrastructure\.env
 }
+
 docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml config --quiet
-docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml pull
-docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d
+docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml pull postgres redis rabbitmq
+docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d --build
 docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml ps
 ```
+
+این یک دستور Compose برای تمام مؤلفه‌های Platform است؛ Gateway هم همراه زیرساخت Build و اجرا می‌شود و پورت محلی `8080` را در اختیار می‌گیرد.
 
 پس از بالا آمدن PostgreSQL، دیتابیس‌ها و Roleهای اختصاصی سرویس‌ها را ایجاد کن (اجرای مجدد این دستور امن است):
 
@@ -27,21 +32,66 @@ docker compose --env-file platform/infrastructure/.env -f platform/infrastructur
 platform\infrastructure\scripts\bootstrap-databases.cmd
 ```
 
-این مرحله را قبل از اجرای اپلیکیشن‌ها انجام بده. هر سه اپلیکیشن از میزبان `postgres:5432` روی شبکه `exchange-network` استفاده می‌کنند.
+این مرحله را پیش از اجرای اپلیکیشن‌ها انجام بده. هر سه اپلیکیشن از میزبان `postgres:5432` روی شبکه `exchange-network` استفاده می‌کنند.
 
-در `.env` فقط مقادیر Development قرار بده. این فایل در Git ثبت نمی‌شود.
+## ترتیب اجرای اپلیکیشن‌ها
 
-این Compose شبکه مشترک را با نام صریح `exchange-network` ایجاد و مدیریت می‌کند. Compose سه سرویس Identity، Wallet و Trading این شبکه را به‌صورت `external` مصرف می‌کنند. بنابراین زیرساخت را قبل از سرویس‌های اپلیکیشن بالا بیاور و دیگر `docker network create exchange-network` اجرا نکن.
+Compose مرکزی، PostgreSQL و شبکه را ایجاد می‌کند. سپس اپلیکیشن‌های مستقل را اجرا کن:
+
+```powershell
+docker compose --env-file identity-service/.env -f identity-service/compose.yaml up -d --build
+docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml up -d --build
+docker compose --env-file trading-service/.env -f trading-service/compose.yaml up -d --build
+```
+
+Gateway از DNS داخلی Docker برای resolve کردن نام سرویس‌ها استفاده می‌کند؛ بنابراین لازم نیست کانتینرهای Laravel هنگام شروع Gateway از قبل روشن باشند. وقتی سرویس مقصد به شبکه متصل شد، درخواست‌های آن مسیر به مقصد هدایت می‌شوند.
+
+## متغیرهای محیطی
+
+فایل `platform/infrastructure/.env.example` نمونه تنظیمات Platform است. آن را به `.env` کپی کن و مقادیر توسعه را در همان فایل نگه دار.
+
+متغیرهای Gateway:
+
+- `API_GATEWAY_PORT`: پورت میزبان؛ پیش‌فرض `8080`
+- `IDENTITY_SERVICE_HOST` و `IDENTITY_SERVICE_PORT`
+- `WALLET_SERVICE_HOST` و `WALLET_SERVICE_PORT`
+- `TRADING_SERVICE_HOST` و `TRADING_SERVICE_PORT`
+
+مقادیر Host پیش‌فرض با نام کانتینرهای سرویس‌ها هماهنگ هستند. مقادیر DB Roleها و رمزهایشان نیز باید با `DB_USERNAME`، `DB_DATABASE` و `DB_PASSWORD` در فایل `.env` هر سرویس یکسان باشند.
+
+## پورت‌ها
+
+تمام پورت‌ها فقط روی `127.0.0.1` منتشر می‌شوند:
+
+- API Gateway: `8080` (قابل تغییر با `API_GATEWAY_PORT`)
+- PostgreSQL: `5432`
+- Redis: `6379`
+- RabbitMQ AMQP: `5672`
+- RabbitMQ Management: `15672`
+
+سلامت Gateway:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8080/healthz
+```
+
+این Endpoint فقط اجرای Nginx را بررسی می‌کند و سلامت سرویس‌های مقصد را تضمین نمی‌کند.
 
 ## اگر زیرساخت قبلی را اجرا کرده‌ای
 
-نام پروژه Compose همچنان `exchange-platform` است تا Volumeهای فعلی و چرخه منابع قبلی حفظ شوند. تغییر نام شبکه از نام خودکار `exchange-platform_exchange-network` به `exchange-network` باعث اتصال مجدد کانتینرهای زیرساخت به شبکه مشترک با نام ثابت می‌شود؛ Volumeهای PostgreSQL، Redis و RabbitMQ تغییر نام نمی‌دهند.
+نام پروژه Compose همچنان `exchange-platform` است تا Volumeهای فعلی و چرخه منابع قبلی حفظ شوند. نام شبکه نیز `exchange-network` است و سه Compose سرویس‌های Laravel آن را به‌صورت `external` مصرف می‌کنند. زیرساخت را پیش از اپلیکیشن‌ها اجرا کن و دیگر `docker network create exchange-network` اجرا نکن.
 
-برای حفظ داده‌ها هرگز `docker compose down -v` اجرا نکن.
+در نسخه قبلی، Gateway به‌صورت دستی با `docker run` اجرا می‌شد. اگر کانتینر قدیمی با نام `exchange-api-gateway` هنوز وجود دارد، پیش از اجرای Compose جدید یک‌بار آن را حذف کن:
 
-اگر قبلاً شبکه `exchange-network` را دستی ساخته‌ای، پیش از اجرای Compose جدید وضعیت آن را با `docker network inspect exchange-network` بررسی کن. شبکه‌ای که دستی ساخته شده ممکن است با شبکه تحت مدیریت Compose تداخل داشته باشد؛ آن را بدون بررسی کانتینرهای متصل حذف نکن.
+```powershell
+docker rm -f exchange-api-gateway
+```
 
-## انتقال از Composeهای قبلی سرویس‌ها
+این دستور فقط کانتینر قدیمی Gateway را حذف می‌کند و به Volumeهای داده دست نمی‌زند.
+
+اگر قبلاً شبکه `exchange-network` را دستی ساخته‌ای، پیش از اجرای Compose وضعیت آن را با `docker network inspect exchange-network` بررسی کن. شبکه‌ای که دستی ساخته شده ممکن است با شبکه تحت مدیریت Compose تداخل داشته باشد؛ آن را بدون بررسی کانتینرهای متصل حذف نکن.
+
+## انتقال از Composeهای قدیمی سرویس‌ها
 
 در نسخه قبلی هر سرویس کانتینر PostgreSQL خودش را داشت. برای اینکه کانتینرهای دیتابیس قدیمی به‌عنوان orphan روشن نمانند، بعد از دریافت تغییرات، برای هر سرویس یک‌بار دستور متناظر را اجرا کن:
 
@@ -53,7 +103,7 @@ docker compose --env-file trading-service/.env -f trading-service/compose.yaml d
 
 این دستورات کانتینرهای قبلی را متوقف و حذف می‌کنند، اما Volumeهای PostgreSQL قدیمی را حذف نمی‌کنند. داده‌های آن Volumeها خودکار به PostgreSQL مرکزی منتقل نمی‌شوند؛ اگر داده‌ای لازم داری، قبل از کنار گذاشتن دیتابیس‌های قبلی از آن‌ها Backup بگیر. سپس زیرساخت مرکزی را بالا بیاور، bootstrap را اجرا کن و اپلیکیشن‌ها را دوباره اجرا کن. از `down -v` استفاده نکن.
 
-## تست اتصال
+## تست اتصال زیرساخت
 
 ```powershell
 docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml exec postgres pg_isready -U exchange_admin -d postgres
@@ -63,24 +113,15 @@ docker compose --env-file platform/infrastructure/.env -f platform/infrastructur
 
 انتظار Redis برابر `PONG` است.
 
-## پورت‌ها
-
-تمام پورت‌ها فقط روی `127.0.0.1` منتشر می‌شوند:
-
-- PostgreSQL: `5432`
-- Redis: `6379`
-- RabbitMQ AMQP: `5672`
-- RabbitMQ Management: `15672`
-
-پنل RabbitMQ فقط برای توسعه محلی است: [http://localhost:15672](http://localhost:15672).
-
 ## نکات امنیتی و معماری
 
 - رمزهای Development ثابت و ساده‌اند؛ از آن‌ها در Production استفاده نکن.
 - کاربر `exchange_admin` فقط برای عملیات مدیریتی محلی است؛ اپلیکیشن‌ها نباید با آن وصل شوند.
 - هر سرویس از Role و Database اختصاصی استفاده می‌کند.
+- ارتباط داده‌ای بین سرویس‌ها از طریق API یا Event است؛ نه Query مستقیم به دیتابیس سرویس دیگر.
 - این Compose تنها PostgreSQL محلی پروژه را اجرا می‌کند. Identity، Wallet و Trading هرکدام Database و Role اختصاصی خود را روی همین Server دارند و هیچ‌کدام کانتینر PostgreSQL جداگانه‌ای اجرا نمی‌کنند.
-- رمز هر Role در `platform/infrastructure/.env` باید با `DB_PASSWORD` متناظر در فایل `.env` همان سرویس یکسان باشد؛ مقادیر پیش‌فرض فایل‌های نمونه هماهنگ‌اند.
-- اگر قبلاً PostgreSQLهای محلی سرویس‌ها را اجرا کرده‌ای، Volumeهای قدیمی خودکار حذف نمی‌شوند و داده‌هایشان نیز خودکار منتقل نمی‌شود. برای حفظ داده‌ها قبل از کنار گذاشتن آن‌ها Backup بگیر؛ هرگز برای این جابه‌جایی `down -v` اجرا نکن.
+- Gateway فقط درخواست HTTP را مسیریابی می‌کند؛ مالک منطق تجاری یا دیتابیس سرویس‌ها نیست.
+- Secretهای Production نباید در Git ثبت شوند.
+- Volumeهای قدیمی PostgreSQL سرویس‌ها خودکار حذف یا منتقل نمی‌شوند. برای حفظ داده‌ها Backup بگیر و هرگز برای این جابه‌جایی `down -v` اجرا نکن.
 - توپولوژی Production، Backup، HA و سیاست دسترسی باید جداگانه تعیین شود.
 - پیش از استفاده عملیاتی از RabbitMQ و Redis، vhost/user و ACL اختصاصی هر سرویس را تنظیم کن.

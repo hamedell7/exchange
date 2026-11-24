@@ -63,6 +63,25 @@ services:
     networks:
       - exchange-network
 
+  api-gateway:
+    build:
+      context: ../api-gateway
+      dockerfile: Dockerfile
+    image: exchange-api-gateway:local
+    container_name: exchange-api-gateway
+    restart: unless-stopped
+    environment:
+      IDENTITY_SERVICE_HOST: ${IDENTITY_SERVICE_HOST:-identity-service}
+      IDENTITY_SERVICE_PORT: ${IDENTITY_SERVICE_PORT:-8000}
+      TRADING_SERVICE_HOST: ${TRADING_SERVICE_HOST:-trading-service}
+      TRADING_SERVICE_PORT: ${TRADING_SERVICE_PORT:-8000}
+      WALLET_SERVICE_HOST: ${WALLET_SERVICE_HOST:-wallet-service}
+      WALLET_SERVICE_PORT: ${WALLET_SERVICE_PORT:-8000}
+    ports:
+      - "127.0.0.1:${API_GATEWAY_PORT:-8080}:8080"
+    networks:
+      - exchange-network
+
 volumes:
   postgres_data:
   redis_data:
