@@ -49,6 +49,12 @@ final class SyncMarketPrices extends Command
                 "Successfully {$mode} {$result['count']} asset prices. 1 USDT = {$result['usdt_toman_rate']} Toman.",
             );
 
+            if ($result['skipped_count'] > 0) {
+                $this->components->warn(
+                    "Skipped {$result['skipped_count']} assets because CoinMarketCap returned no valid USDT quote for them.",
+                );
+            }
+
             return self::SUCCESS;
         } catch (Throwable $exception) {
             report($exception);
