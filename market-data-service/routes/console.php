@@ -9,5 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('market:sync-prices --limit=250')
-    ->everyMinute()
+    ->everyFiveMinutes()
     ->withoutOverlapping(2);
