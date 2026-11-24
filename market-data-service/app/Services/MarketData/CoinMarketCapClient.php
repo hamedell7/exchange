@@ -38,6 +38,24 @@ final class CoinMarketCapClient
         ]);
     }
 
+    /**
+     * Get current quotes in USDT for a batch of CoinMarketCap asset IDs.
+     *
+     * @param array<int, int> $providerIds
+     * @return array<string, array<string, mixed>>
+     */
+    public function latestUsdtQuotes(array $providerIds): array
+    {
+        if ($providerIds === []) {
+            return [];
+        }
+
+        return $this->get('/v3/cryptocurrency/quotes/latest', [
+            'id' => implode(',', $providerIds),
+            'convert' => 'USDT',
+        ]);
+    }
+
     /** @param array<string, mixed> $query
      *  @return array<mixed>
      */

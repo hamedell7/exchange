@@ -23,6 +23,10 @@ final class MarketAssetResource extends JsonResource
             'tags' => $this->tags,
             'platform' => $this->platform,
             'rank' => $this->market_cap_rank,
+            'price_usdt' => $this->quote?->price,
+            'price_toman' => $this->price_toman,
+            'percent_change_24h' => $this->quote?->percent_change_24h,
+            'price_updated_at' => $this->quote?->fetched_at?->toISOString(),
             'date_added' => $this->date_added?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
