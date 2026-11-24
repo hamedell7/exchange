@@ -39,7 +39,7 @@ final class CoinMarketCapClient
     }
 
     /**
-     * Get current quotes in USDT for a batch of CoinMarketCap asset IDs.
+     * Normalize CMC V3's list response and quote list into an ID-keyed map.
      *
      * @param array<int, int> $providerIds
      * @return array<string, array<string, mixed>>
@@ -50,10 +50,48 @@ final class CoinMarketCapClient
             return [];
         }
 
-        return $this->get('/v3/cryptocurrency/quotes/latest', [
+        $data = $this->get('/v3/cryptocurrency/quotes/latest', [
             'id' => implode(',', $providerIds),
             'convert' => 'USDT',
+            'skip_invalid' => 'true',
         ]);
+
+        $quotesById = [];
+
+        foreach ($data as $key => $asset) {
+            if (! is_array($asset)) {
+                continue;
+            }
+
+            $providerId = (int) ($asset['id'] ?? (is_numeric($key) ? $key : 0));
+
+            if ($providerId <= 0) {
+                continue;
+            }
+
+            $quotes = $asset['quote'] ?? [];
+            $usdtQuote = null;
+
+            // V3 returns quote as a list of conversion objects; legacy responses
+            // used an object keyed by the conversion symbol.
+            if (is_array($quotes) && array_is_list($quotes)) {
+                foreach ($quotes as $quote) {
+                    if (is_array($quote) && strtoupper((string) ($quote['symbol'] ?? '')) === 'USDT') {
+                        $usdtQuote = $quote;
+                        break;
+                    }
+                }
+            } elseif (is_array($quotes)) {
+                $usdtQuote = $quotes['USDT'] ?? null;
+            }
+
+            if (is_array($usdtQuote)) {
+                $asset['quote'] = ['USDT' => $usdtQuote];
+                $quotesById[(string) $providerId] = $asset;
+            }
+        }
+
+        return $quotesById;
     }
 
     /** @param array<string, mixed> $query
