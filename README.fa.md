@@ -69,6 +69,12 @@ Platform را اجرا کنید:
     docker compose --env-file wallet-service/.env -f wallet-service/compose.yaml up -d --build
     docker compose --env-file trading-service/.env -f trading-service/compose.yaml up -d --build
 
+اگر فایل محیطی Market Data را نداری، ابتدا بساز:
+
+    if (-not (Test-Path .\\market-data-service\\.env)) {
+        Copy-Item .\\market-data-service\\.env.example .\\market-data-service\\.env
+    }
+
 برای Market Data، مقدار `CMC_API_KEY` را در فایل محلی `market-data-service/.env` وارد کن و پس از اجرای Platform و bootstrap دیتابیس‌ها، اجرا کن:
 
     docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml up -d --build
