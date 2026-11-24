@@ -1,0 +1,45 @@
+name: exchange-trading
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: exchange-trading:local
+    container_name: trading-service
+    restart: unless-stopped
+    environment:
+      APP_NAME: trading
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-http://localhost:8002}
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: trading_db
+      DB_USERNAME: trading_app
+      DB_PASSWORD: ${DB_PASSWORD:-local_trading_dev}
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: database
+    # Development: live source on the host, Linux dependencies in a Docker volume.
+    volumes:
+      - type: bind
+        source: .
+        target: /var/www/html
+      - type: volume
+        source: trading_vendor
+        target: /var/www/html/vendor
+    ports:
+      - "127.0.0.1:8002:8000"
+    networks:
+      - exchange-network
+
+volumes:
+  trading_vendor:
+
+networks:
+  exchange-network:
+    external: true
+    name: exchange-network
