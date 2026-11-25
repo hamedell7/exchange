@@ -9,16 +9,16 @@ services:
     restart: unless-stopped
     environment:
       APP_NAME: market-data
-      APP_ENV: \${APP_ENV:-local}
-      APP_DEBUG: \${APP_DEBUG:-true}
-      APP_URL: \${APP_URL:-http://localhost:8003}
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-http://localhost:8003}
       LOG_CHANNEL: stderr
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_DATABASE: \${DB_DATABASE:-market_data_db}
-      DB_USERNAME: \${DB_USERNAME:-market_data_app}
-      DB_PASSWORD: \${DB_PASSWORD:-local_market_data_dev}
+      DB_DATABASE: ${DB_DATABASE:-market_data_db}
+      DB_USERNAME: ${DB_USERNAME:-market_data_app}
+      DB_PASSWORD: ${DB_PASSWORD:-local_market_data_dev}
       CACHE_STORE: database
       SESSION_DRIVER: database
       QUEUE_CONNECTION: database
@@ -26,15 +26,15 @@ services:
       REVERB_HOST: app
       REVERB_PORT: 8080
       REVERB_SCHEME: http
-      REVERB_APP_ID: \${REVERB_APP_ID:-}
-      REVERB_APP_KEY: \${REVERB_APP_KEY:-}
-      REVERB_APP_SECRET: \${REVERB_APP_SECRET:-}
-      CMC_API_KEY: \${CMC_API_KEY:-}
-      CMC_BASE_URL: \${CMC_BASE_URL:-https://pro-api.coinmarketcap.com}
-      CMC_HTTP_TIMEOUT: \${CMC_HTTP_TIMEOUT:-30}
-      NOBITEX_BASE_URL: \${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
-      NOBITEX_WS_URL: \${NOBITEX_WS_URL:-wss://ws.nobitex.ir/connection/websocket}
-      NOBITEX_HTTP_TIMEOUT: \${NOBITEX_HTTP_TIMEOUT:-15}
+      REVERB_APP_ID: ${REVERB_APP_ID:-}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-}
+      CMC_API_KEY: ${CMC_API_KEY:-}
+      CMC_BASE_URL: ${CMC_BASE_URL:-https://pro-api.coinmarketcap.com}
+      CMC_HTTP_TIMEOUT: ${CMC_HTTP_TIMEOUT:-30}
+      NOBITEX_BASE_URL: ${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
+      NOBITEX_WS_URL: ${NOBITEX_WS_URL:-wss://ws.nobitex.ir/connection/websocket}
+      NOBITEX_HTTP_TIMEOUT: ${NOBITEX_HTTP_TIMEOUT:-15}
     volumes:
       - type: bind
         source: .
@@ -58,16 +58,16 @@ services:
       - app
     environment:
       APP_NAME: market-data
-      APP_ENV: \${APP_ENV:-local}
-      APP_DEBUG: \${APP_DEBUG:-true}
-      APP_URL: \${APP_URL:-http://localhost:8003}
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-http://localhost:8003}
       LOG_CHANNEL: stderr
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_DATABASE: \${DB_DATABASE:-market_data_db}
-      DB_USERNAME: \${DB_USERNAME:-market_data_app}
-      DB_PASSWORD: \${DB_PASSWORD:-local_market_data_dev}
+      DB_DATABASE: ${DB_DATABASE:-market_data_db}
+      DB_USERNAME: ${DB_USERNAME:-market_data_app}
+      DB_PASSWORD: ${DB_PASSWORD:-local_market_data_dev}
       CACHE_STORE: database
       SESSION_DRIVER: database
       QUEUE_CONNECTION: database
@@ -75,12 +75,12 @@ services:
       REVERB_HOST: app
       REVERB_PORT: 8080
       REVERB_SCHEME: http
-      REVERB_APP_ID: \${REVERB_APP_ID:-}
-      REVERB_APP_KEY: \${REVERB_APP_KEY:-}
-      REVERB_APP_SECRET: \${REVERB_APP_SECRET:-}
-      NOBITEX_BASE_URL: \${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
-      NOBITEX_WS_URL: \${NOBITEX_WS_URL:-wss://ws.nobitex.ir/connection/websocket}
-      NOBITEX_HTTP_TIMEOUT: \${NOBITEX_HTTP_TIMEOUT:-15}
+      REVERB_APP_ID: ${REVERB_APP_ID:-}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-}
+      NOBITEX_BASE_URL: ${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
+      NOBITEX_WS_URL: ${NOBITEX_WS_URL:-wss://ws.nobitex.ir/connection/websocket}
+      NOBITEX_HTTP_TIMEOUT: ${NOBITEX_HTTP_TIMEOUT:-15}
     volumes:
       - type: bind
         source: .
@@ -101,15 +101,15 @@ services:
       - app
     environment:
       APP_NAME: market-data
-      APP_ENV: \${APP_ENV:-local}
-      APP_DEBUG: \${APP_DEBUG:-true}
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
       LOG_CHANNEL: stderr
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_DATABASE: \${DB_DATABASE:-market_data_db}
-      DB_USERNAME: \${DB_USERNAME:-market_data_app}
-      DB_PASSWORD: \${DB_PASSWORD:-local_market_data_dev}
+      DB_DATABASE: ${DB_DATABASE:-market_data_db}
+      DB_USERNAME: ${DB_USERNAME:-market_data_app}
+      DB_PASSWORD: ${DB_PASSWORD:-local_market_data_dev}
       CACHE_STORE: database
       SESSION_DRIVER: database
       QUEUE_CONNECTION: database
@@ -117,12 +117,12 @@ services:
       REVERB_HOST: app
       REVERB_PORT: 8080
       REVERB_SCHEME: http
-      REVERB_APP_ID: \${REVERB_APP_ID:-}
-      REVERB_APP_KEY: \${REVERB_APP_KEY:-}
-      REVERB_APP_SECRET: \${REVERB_APP_SECRET:-}
-      NOBITEX_BASE_URL: \${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
-      NOBITEX_WS_URL: \${NOBITEX_WS_URL:-wss://ws.nobitex.ir/connection/websocket}
-      NOBITEX_HTTP_TIMEOUT: \${NOBITEX_HTTP_TIMEOUT:-15}
+      REVERB_APP_ID: ${REVERB_APP_ID:-}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-}
+      NOBITEX_BASE_URL: ${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
+      NOBITEX_WS_URL: ${NOBITEX_WS_URL:-wss://ws.nobitex.ir/connection/websocket}
+      NOBITEX_HTTP_TIMEOUT: ${NOBITEX_HTTP_TIMEOUT:-15}
     volumes:
       - type: bind
         source: .
