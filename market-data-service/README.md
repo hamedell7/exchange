@@ -35,11 +35,13 @@ Set the Reverb app credentials in \`market-data-service/.env\`:
     REVERB_APP_ID=your_app_id
     REVERB_APP_KEY=your_app_key
     REVERB_APP_SECRET=your_app_secret
-    REVERB_HOST=app
+    REVERB_HOST=reverb
     REVERB_PORT=8080
     REVERB_SCHEME=http
     REVERB_SERVER_HOST=0.0.0.0
     REVERB_SERVER_PORT=8080
+    REVERB_MAX_REQUEST_SIZE=1048576
+    REVERB_APP_MAX_MESSAGE_SIZE=1048576
 
 Do not commit real credentials.
 
@@ -48,9 +50,11 @@ Start shared infrastructure and create the Market Data database/role:
     docker compose --env-file platform/infrastructure/.env -f platform/infrastructure/compose.yaml up -d
     platform\\infrastructure\\scripts\\bootstrap-databases.cmd
 
-Build and start the API container:
+Build and start the API and dedicated Reverb containers:
 
-    docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml up -d --build app
+    docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml up -d --build app reverb
+
+Reverb runs as its own restartable container and exposes the local WebSocket endpoint on `127.0.0.1:8082`. The default HTTP request and app message size limits are 1 MiB to accommodate batched market-price updates.
 
 Run migrations:
 
@@ -120,8 +124,13 @@ Inspect the streamer:
 
     docker logs --tail 100 market-data-streamer
 
-Restart it:
+Inspect Reverb:
 
+    docker logs --tail 100 market-data-reverb
+
+Restart Reverb or the market streamer independently:
+
+    docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml restart reverb
     docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml restart streamer
 
 ## Frontend live connection
