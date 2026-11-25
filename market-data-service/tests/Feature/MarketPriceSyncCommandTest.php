@@ -15,7 +15,7 @@ final class MarketPriceSyncCommandTest extends TestCase
 
     public function test_command_synchronizes_binance_spot_usdt_quotes_and_the_toman_exchange_rate(): void
     {
-        MarketAsset::query()->create([
+        $bitcoin = MarketAsset::query()->create([
             'provider' => 'coinmarketcap',
             'provider_asset_id' => 1,
             'name' => 'Bitcoin',
@@ -53,7 +53,7 @@ final class MarketPriceSyncCommandTest extends TestCase
             ->assertExitCode(0);
 
         $this->assertDatabaseHas('market_asset_quotes', [
-            'market_asset_id' => 1,
+            'market_asset_id' => $bitcoin->id,
             'quote_currency' => 'USDT',
             'price' => '65000.25',
             'volume_24h' => '25000000000',
@@ -72,11 +72,13 @@ final class MarketPriceSyncCommandTest extends TestCase
 
     public function test_assets_without_a_binance_usdt_spot_market_are_skipped(): void
     {
+        $assetsBySymbol = [];
+
         foreach ([
             ['id' => 1, 'name' => 'Bitcoin', 'symbol' => 'BTC'],
             ['id' => 2, 'name' => 'Ethereum', 'symbol' => 'ETH'],
         ] as $asset) {
-            MarketAsset::query()->create([
+            $assetsBySymbol[$asset['symbol']] = MarketAsset::query()->create([
                 'provider' => 'coinmarketcap',
                 'provider_asset_id' => $asset['id'],
                 'name' => $asset['name'],
@@ -117,11 +119,11 @@ final class MarketPriceSyncCommandTest extends TestCase
 
         $this->assertDatabaseCount('market_asset_quotes', 1);
         $this->assertDatabaseHas('market_asset_quotes', [
-            'market_asset_id' => 1,
+            'market_asset_id' => $assetsBySymbol['BTC']->id,
             'provider' => 'binance',
         ]);
         $this->assertDatabaseMissing('market_asset_quotes', [
-            'market_asset_id' => 2,
+            'market_asset_id' => $assetsBySymbol['ETH']->id,
             'quote_currency' => 'USDT',
         ]);
     }
