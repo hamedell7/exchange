@@ -11,7 +11,7 @@ Laravel 13 microservice that owns the public global asset catalog and cached mar
 - Stores current quotes and the USDT/Toman exchange rate in PostgreSQL.
 - Exposes a public, read-only REST endpoint with USDT and Toman prices and 24-hour changes.
 - Refreshes the top 250 asset prices every five minutes using a dedicated Laravel scheduler container.
-- Does not implement WebSocket; clients currently use ordinary HTTP requests.
+- Includes an opt-in CoinMarketCap WebSocket smoke-test command. Live stream values are not persisted or broadcast to browser clients yet.
 
 ## Local Docker development (PowerShell, from repository root)
 
@@ -72,6 +72,20 @@ Nobitex GET /market/stats?srcCurrency=usdt&dstCurrency=rls returns the USDT/Rial
     price_toman = price_usdt * usdt_toman_rate
 
 The price sync is atomic: if either provider fails or returns incomplete data, the current quote batch is not partially persisted. The previous valid prices remain available until a successful sync.
+
+## Live CoinMarketCap WebSocket smoke test
+
+The service can open an outbound WebSocket connection to CoinMarketCap and print live prices for a small number of assets. This command is deliberately read-only: it does not write to PostgreSQL and does not publish browser events.
+
+CoinMarketCap's `market@crypto_latest_price` channel returns USD-denominated prices. Do not treat those values as USDT or overwrite the current USDT quotes until the conversion and persistence flow has been designed and tested.
+
+Run the smoke test from the repository root:
+
+    docker compose -f .\\market-data-service\\compose.yaml exec app php artisan market:stream-cmc --limit=5
+
+The command selects the top active CoinMarketCap assets already imported into the database. Use `--limit=1` for a one-asset test; the supported range is 1-100. Press Ctrl+C to stop. Transient network failures are retried with exponential backoff; authentication, plan, and subscription errors stop the process instead of retrying forever.
+
+WebSocket access requires a CoinMarketCap Startup plan or above. The API key is sent server-side in the `X-CMC_PRO_API_KEY` handshake header and is never exposed to the browser. Keep `CMC_API_KEY` in the local environment file and never commit it.
 
 ## Public API
 

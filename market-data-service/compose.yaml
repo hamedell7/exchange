@@ -25,6 +25,8 @@ services:
       CMC_API_KEY: ${CMC_API_KEY:-}
       CMC_BASE_URL: ${CMC_BASE_URL:-https://pro-api.coinmarketcap.com}
       CMC_HTTP_TIMEOUT: ${CMC_HTTP_TIMEOUT:-30}
+      CMC_WS_URL: ${CMC_WS_URL:-wss://pro-stream.coinmarketcap.com/v1}
+      CMC_WS_PING_INTERVAL_MS: ${CMC_WS_PING_INTERVAL_MS:-10000}
       NOBITEX_BASE_URL: ${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
       NOBITEX_HTTP_TIMEOUT: ${NOBITEX_HTTP_TIMEOUT:-15}
     volumes:
@@ -67,6 +69,8 @@ services:
       CMC_API_KEY: ${CMC_API_KEY:-}
       CMC_BASE_URL: ${CMC_BASE_URL:-https://pro-api.coinmarketcap.com}
       CMC_HTTP_TIMEOUT: ${CMC_HTTP_TIMEOUT:-30}
+      CMC_WS_URL: ${CMC_WS_URL:-wss://pro-stream.coinmarketcap.com/v1}
+      CMC_WS_PING_INTERVAL_MS: ${CMC_WS_PING_INTERVAL_MS:-10000}
       NOBITEX_BASE_URL: ${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
       NOBITEX_HTTP_TIMEOUT: ${NOBITEX_HTTP_TIMEOUT:-15}
     volumes:
