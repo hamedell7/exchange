@@ -22,11 +22,12 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Long-running, unauthenticated Binance public market-data WebSocket consumer.
- * Reuses ReactPHP and Ratchet components already installed by Laravel Reverb.
+ * One long-lived, unauthenticated connection to Nobitex public market stats.
+ * Uses the Centrifugo JSON protocol documented by Nobitex.
  */
-final class BinanceWebSocketClient
+final class NobitexWebSocketClient
 {
+    private string $endpoint = '';
     private const MAX_HANDSHAKE_BYTES = 32768;
     private const MAX_FRAME_BYTES = 4194304;
     private const MAX_RECONNECT_DELAY_SECONDS = 60;
@@ -37,31 +38,32 @@ final class BinanceWebSocketClient
     private ?MessageBuffer $messageBuffer = null;
     private ?TimerInterface $handshakeTimer = null;
     private ?TimerInterface $reconnectTimer = null;
-    private string $endpoint = '';
     private int $reconnectAttempts = 0;
     private bool $handshakeComplete = false;
+    private bool $centrifugoConnected = false;
+    private bool $subscriptionRequested = false;
     private bool $reconnectScheduled = false;
     private bool $stopped = false;
     private bool $fatalError = false;
 
-    /** @var callable(array<int, array<string, mixed>>): void */
-    private $onTickers;
+    /** @var callable(array<string, array<string, mixed>>): void */
+    private $onStats;
 
     /** @var callable(string, string): void */
     private $onStatus;
 
     /**
-     * @param callable(array<int, array<string, mixed>>): void $onTickers
+     * @param callable(array<string, array<string, mixed>>): void $onStats
      * @param callable(string, string): void $onStatus
      */
-    public function listen(callable $onTickers, callable $onStatus): bool
+    public function listen(callable $onStats, callable $onStatus): bool
     {
-        $this->endpoint = (string) config(
-            'services.binance.websocket_url',
-            'wss://data-stream.binance.vision:443/ws/!ticker_1d@arr',
-        );
-        $this->onTickers = $onTickers;
+        $this->onStats = $onStats;
         $this->onStatus = $onStatus;
+        $this->endpoint = (string) config(
+            'services.nobitex.websocket_url',
+            'wss://ws.nobitex.ir/connection/websocket',
+        );
         $this->loop = Loop::get();
         $this->connector = new Connector(['timeout' => 15], $this->loop);
 
@@ -81,15 +83,14 @@ final class BinanceWebSocketClient
         $parts = parse_url($this->endpoint);
 
         if (! is_array($parts) || ($parts['scheme'] ?? null) !== 'wss' || empty($parts['host'])) {
-            $this->notifyStatus('error', 'BINANCE_SPOT_WS_URL must be a valid wss:// URL.');
+            $this->notifyStatus('error', 'NOBITEX_WS_URL must be a valid wss:// URL.');
             $this->stop(true);
-
             return;
         }
 
         $host = (string) $parts['host'];
         $port = (int) ($parts['port'] ?? 443);
-        $this->notifyStatus('info', "Connecting to Binance {$host}:{$port}...");
+        $this->notifyStatus('info', "Connecting to Nobitex {$host}:{$port}...");
 
         $this->connector->connect("tls://{$host}:{$port}")->then(
             function (ConnectionInterface $stream) use ($parts, $host, $port): void {
@@ -109,9 +110,11 @@ final class BinanceWebSocketClient
     {
         $this->stream = $stream;
         $this->handshakeComplete = false;
+        $this->centrifugoConnected = false;
+        $this->subscriptionRequested = false;
         $this->messageBuffer = null;
 
-        $path = (string) ($parts['path'] ?? '/');
+        $path = (string) ($parts['path'] ?? '/connection/websocket');
         $query = isset($parts['query']) ? '?'.$parts['query'] : '';
         $authority = $host.($port === 443 ? '' : ':'.$port);
         $uri = new Uri('https://'.$authority.$path.$query);
@@ -129,7 +132,7 @@ final class BinanceWebSocketClient
 
         $this->handshakeTimer = $this->loop->addTimer(15, function () use ($stream): void {
             if (! $this->handshakeComplete) {
-                $this->notifyStatus('warning', 'Binance WebSocket handshake timed out.');
+                $this->notifyStatus('warning', 'Nobitex WebSocket handshake timed out.');
                 $stream->close();
             }
         });
@@ -143,7 +146,7 @@ final class BinanceWebSocketClient
             $handshakeBuffer .= $chunk;
 
             if (strlen($handshakeBuffer) > self::MAX_HANDSHAKE_BYTES) {
-                $this->notifyStatus('error', 'Binance handshake response exceeded the allowed size.');
+                $this->notifyStatus('error', 'Nobitex handshake response exceeded the allowed size.');
                 $this->stop(true);
                 return;
             }
@@ -160,7 +163,7 @@ final class BinanceWebSocketClient
             try {
                 $response = Psr7Message::parseResponse($rawHeaders);
             } catch (Throwable $exception) {
-                $this->notifyStatus('error', 'Could not parse Binance handshake response: '.$exception->getMessage());
+                $this->notifyStatus('error', 'Could not parse Nobitex handshake response: '.$exception->getMessage());
                 $this->stop(true);
                 return;
             }
@@ -169,11 +172,11 @@ final class BinanceWebSocketClient
                 $statusCode = $response->getStatusCode();
 
                 if ($statusCode === 429 || $statusCode >= 500) {
-                    $this->scheduleReconnect(new RuntimeException("Binance WebSocket handshake returned HTTP {$statusCode}."));
+                    $this->scheduleReconnect(new RuntimeException("Nobitex WebSocket handshake returned HTTP {$statusCode}."));
                     return;
                 }
 
-                $this->notifyStatus('error', "Binance rejected the WebSocket handshake with HTTP {$statusCode}.");
+                $this->notifyStatus('error', "Nobitex rejected the WebSocket handshake with HTTP {$statusCode}.");
                 $this->stop(true);
                 return;
             }
@@ -189,7 +192,7 @@ final class BinanceWebSocketClient
         });
 
         $stream->on('error', function (Throwable $exception): void {
-            $this->notifyStatus('warning', 'Binance socket error: '.$exception->getMessage());
+            $this->notifyStatus('warning', 'Nobitex socket error: '.$exception->getMessage());
         });
 
         $stream->on('close', function () use ($stream): void {
@@ -202,7 +205,7 @@ final class BinanceWebSocketClient
             $this->handshakeTimer = null;
 
             if (! $this->stopped) {
-                $this->scheduleReconnect(new RuntimeException('Binance WebSocket connection closed.'));
+                $this->scheduleReconnect(new RuntimeException('Nobitex WebSocket connection closed.'));
             }
         });
 
@@ -228,8 +231,7 @@ final class BinanceWebSocketClient
 
     private function onConnected(ConnectionInterface $stream): void
     {
-        $this->reconnectScheduled = false;
-        $this->notifyStatus('connected', 'Connected to Binance all-market 24-hour ticker stream.');
+        $this->notifyStatus('connected', 'WebSocket transport connected; starting Nobitex Centrifugo session.');
 
         $buffer = null;
         $buffer = new MessageBuffer(
@@ -241,7 +243,6 @@ final class BinanceWebSocketClient
                 $opcode = $frame->getOpcode();
 
                 if ($opcode === Frame::OP_PING) {
-                    // Binance requires clients to answer server ping frames with pong.
                     $buffer?->sendFrame($buffer->newFrame($frame->getPayload(), true, Frame::OP_PONG));
                     return;
                 }
@@ -251,7 +252,7 @@ final class BinanceWebSocketClient
                     $closeCode = strlen($payload) >= 2 ? unpack('n', substr($payload, 0, 2))[1] : null;
                     $this->notifyStatus(
                         'warning',
-                        'Binance closed the WebSocket connection'.($closeCode === null ? '.' : " ({$closeCode})."),
+                        'Nobitex closed the WebSocket connection'.($closeCode === null ? '.' : " ({$closeCode})."),
                     );
                     $buffer?->sendFrame($buffer->newFrame($payload, true, Frame::OP_CLOSE));
                     $stream->end();
@@ -268,6 +269,7 @@ final class BinanceWebSocketClient
         );
 
         $this->messageBuffer = $buffer;
+        $this->sendJson(NobitexStreamProtocol::connectMessage());
     }
 
     private function feedFrames(string $chunk): void
@@ -275,7 +277,7 @@ final class BinanceWebSocketClient
         try {
             $this->messageBuffer?->onData($chunk);
         } catch (Throwable $exception) {
-            $this->notifyStatus('warning', 'Invalid Binance WebSocket frame: '.$exception->getMessage());
+            $this->notifyStatus('warning', 'Invalid Nobitex WebSocket frame: '.$exception->getMessage());
 
             if ($this->stream !== null) {
                 $this->stream->close();
@@ -285,30 +287,68 @@ final class BinanceWebSocketClient
 
     private function handleMessage(string $payload, ConnectionInterface $stream): void
     {
-        if (BinanceStreamProtocol::isServerShutdownPayload($payload)) {
-            $this->notifyStatus('info', 'Binance announced a planned server shutdown; reconnecting.');
-            $stream->close();
-            return;
-        }
-
         try {
-            $tickers = BinanceStreamProtocol::decodeTickers($payload);
+            if (NobitexStreamProtocol::isApplicationPing($payload)) {
+                $this->sendText('{}');
+                return;
+            }
+
+            $decoded = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+
+            if (! is_array($decoded)) {
+                return;
+            }
+
+            if (isset($decoded['id']) && (int) $decoded['id'] === 1 && isset($decoded['connect'])) {
+                if (isset($decoded['error'])) {
+                    $this->notifyStatus('error', 'Nobitex Centrifugo connect failed: '.json_encode($decoded['error']));
+                    $this->stop(true);
+                    return;
+                }
+
+                $this->centrifugoConnected = true;
+                $this->reconnectAttempts = 0;
+                $this->notifyStatus('connected', 'Connected to Nobitex public market-data service.');
+                $this->sendJson(NobitexStreamProtocol::subscribeMessage());
+                $this->subscriptionRequested = true;
+                return;
+            }
+
+            if (isset($decoded['id']) && (int) $decoded['id'] === 2 && isset($decoded['subscribe'])) {
+                if (isset($decoded['error'])) {
+                    $this->notifyStatus('error', 'Nobitex market-stats subscription failed: '.json_encode($decoded['error']));
+                    $this->stop(true);
+                    return;
+                }
+
+                $this->notifyStatus('connected', 'Subscribed to public:market-stats-all.');
+                return;
+            }
+
+            $stats = NobitexStreamProtocol::decodeStatsPublication($payload);
+
+            if ($stats !== null && $stats !== []) {
+                ($this->onStats)($stats);
+            }
         } catch (Throwable $exception) {
-            $this->notifyStatus('warning', 'Ignored an invalid Binance ticker payload: '.$exception->getMessage());
+            $this->notifyStatus('warning', 'Ignored an invalid Nobitex WebSocket message: '.$exception->getMessage());
+        }
+    }
+
+    /** @param array<string, mixed> $message */
+    private function sendJson(array $message): void
+    {
+        $this->sendText(json_encode($message, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function sendText(string $payload): void
+    {
+        if ($this->messageBuffer === null || $this->stream === null || ! $this->stream->isWritable()) {
             return;
         }
 
-        if ($tickers === []) {
-            return;
-        }
-
-        $this->reconnectAttempts = 0;
-
-        try {
-            ($this->onTickers)($tickers);
-        } catch (Throwable $exception) {
-            $this->notifyStatus('warning', 'Binance ticker callback failed: '.$exception->getMessage());
-        }
+        $frame = $this->messageBuffer->newFrame($payload, true, Frame::OP_TEXT);
+        $this->messageBuffer->sendFrame($frame);
     }
 
     private function scheduleReconnect(Throwable $exception): void
@@ -333,7 +373,7 @@ final class BinanceWebSocketClient
         $this->reconnectAttempts++;
 
         $this->notifyStatus('warning', $exception->getMessage());
-        $this->notifyStatus('info', "Reconnecting to Binance in {$delay} second(s)...");
+        $this->notifyStatus('info', "Reconnecting to Nobitex in {$delay} second(s)...");
 
         $this->reconnectTimer = $this->loop->addTimer((float) $delay, function (): void {
             $this->reconnectScheduled = false;
@@ -350,7 +390,7 @@ final class BinanceWebSocketClient
 
         if (defined('SIGINT')) {
             $this->loop->addSignal(SIGINT, function (): void {
-                $this->notifyStatus('info', 'Stopping Binance market stream...');
+                $this->notifyStatus('info', 'Stopping Nobitex market stream...');
                 $this->stop();
             });
         }

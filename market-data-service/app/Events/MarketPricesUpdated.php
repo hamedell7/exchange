@@ -21,6 +21,7 @@ final class MarketPricesUpdated implements ShouldBroadcastNow
         private readonly array $prices,
         private readonly ?string $usdtTomanRate,
         private readonly ?string $rateUpdatedAt,
+        private readonly string $source = 'nobitex',
     ) {}
 
     /** @return array<int, Channel> */
@@ -38,7 +39,7 @@ final class MarketPricesUpdated implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
-            'source' => 'binance-spot',
+            'source' => $this->source,
             'prices' => $this->prices,
             'market_data' => [
                 'usdt_toman_rate' => $this->usdtTomanRate,

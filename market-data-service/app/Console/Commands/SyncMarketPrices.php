@@ -15,7 +15,7 @@ final class SyncMarketPrices extends Command
                             {--limit=250 : Maximum number of ranked active assets to update (1-5000)}
                             {--dry-run : Fetch and validate prices without writing to the database}';
 
-    protected $description = 'Synchronize Binance Spot USDT prices and the USDT/Toman market rate.';
+    protected $description = 'Synchronize Nobitex USDT prices and the USDT/Toman market rate.';
 
     public function handle(MarketPriceSyncService $syncService): int
     {
@@ -44,12 +44,12 @@ final class SyncMarketPrices extends Command
             $mode = $this->option('dry-run') ? 'validated (database unchanged)' : 'synchronized';
 
             $this->components->info(
-                "Successfully {$mode} {$result['count']} Binance Spot asset prices. 1 USDT = {$result['usdt_toman_rate']} Toman.",
+                "Successfully {$mode} {$result['count']} Nobitex asset prices. 1 USDT = {$result['usdt_toman_rate']} Toman.",
             );
 
             if ($result['skipped_count'] > 0) {
                 $this->components->warn(
-                    "Skipped {$result['skipped_count']} assets because Binance has no unambiguous active USDT Spot market for them.",
+                    "Skipped {$result['skipped_count']} assets because Nobitex has no matching active USDT or RLS market for them.",
                 );
             }
 

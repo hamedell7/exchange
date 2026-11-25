@@ -13,7 +13,7 @@ final class MarketPriceSyncCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_command_synchronizes_binance_spot_usdt_quotes_and_the_toman_exchange_rate(): void
+    public function test_command_synchronizes_nobitex_prices_and_the_usdt_toman_exchange_rate(): void
     {
         $bitcoin = MarketAsset::query()->create([
             'provider' => 'coinmarketcap',
@@ -25,110 +25,138 @@ final class MarketPriceSyncCommandTest extends TestCase
             'is_active' => true,
         ]);
 
+        $ethereum = MarketAsset::query()->create([
+            'provider' => 'coinmarketcap',
+            'provider_asset_id' => 2,
+            'name' => 'Ethereum',
+            'symbol' => 'ETH',
+            'slug' => 'ethereum',
+            'market_cap_rank' => 2,
+            'is_active' => true,
+        ]);
+
         Http::fake([
-            '*api/v3/exchangeInfo*' => Http::response([
-                'symbols' => [[
-                    'symbol' => 'BTCUSDT',
-                    'status' => 'TRADING',
-                    'baseAsset' => 'BTC',
-                    'quoteAsset' => 'USDT',
-                    'isSpotTradingAllowed' => true,
-                ]],
-            ]),
-            '*api/v3/ticker/24hr*' => Http::response([[
-                'symbol' => 'BTCUSDT',
-                'lastPrice' => '65000.25',
-                'quoteVolume' => '25000000000',
-                'priceChangePercent' => '2.5',
-                'closeTime' => 1795514400000,
-            ]]),
             '*market/stats*' => Http::response([
                 'status' => 'ok',
-                'stats' => ['usdt-rls' => ['latest' => '950000']],
+                'stats' => [
+                    'btc-rls' => [
+                        'latest' => '61750237500',
+                        'dayOpen' => '60000000000',
+                        'dayChange' => '2.9167',
+                        'volumeDst' => '6175023750000',
+                    ],
+                    'eth-usdt' => [
+                        'latest' => '3200.50',
+                        'dayChange' => '-0.5',
+                        'volumeDst' => '150000',
+                    ],
+                    'usdt-rls' => [
+                        'latest' => '950000',
+                        'dayOpen' => '940000',
+                        'dayChange' => '1.0638',
+                    ],
+                ],
             ]),
         ]);
 
         $this->artisan('market:sync-prices --limit=250')
-            ->expectsOutputToContain('Successfully synchronized 1 Binance Spot asset prices.')
+            ->expectsOutputToContain('Successfully synchronized 2 Nobitex asset prices.')
             ->assertExitCode(0);
 
         $this->assertDatabaseHas('market_asset_quotes', [
             'market_asset_id' => $bitcoin->id,
             'quote_currency' => 'USDT',
-            'price' => '65000.25',
-            'volume_24h' => '25000000000',
-            'percent_change_24h' => '2.5',
-            'provider' => 'binance',
+            'price' => '65000.250000000000000000000000',
+            'provider' => 'nobitex',
+        ]);
+
+        $this->assertDatabaseHas('market_asset_quotes', [
+            'market_asset_id' => $ethereum->id,
+            'quote_currency' => 'USDT',
+            'price' => '3200.500000000000000000000000',
+            'percent_change_24h' => '-0.50000000',
+            'provider' => 'nobitex',
         ]);
 
         $this->assertDatabaseHas('market_exchange_rates', [
             'base_currency' => 'USDT',
             'quote_currency' => 'TOMAN',
-            'rate' => '95000',
+            'rate' => '95000.000000000000',
             'provider' => 'nobitex',
             'provider_pair' => 'usdt-rls',
         ]);
     }
 
-    public function test_assets_without_a_binance_usdt_spot_market_are_skipped(): void
+    public function test_assets_without_a_nobitex_market_are_skipped_and_old_quotes_removed(): void
     {
-        $assetsBySymbol = [];
+        $bitcoin = MarketAsset::query()->create([
+            'provider' => 'coinmarketcap',
+            'provider_asset_id' => 1,
+            'name' => 'Bitcoin',
+            'symbol' => 'BTC',
+            'slug' => 'bitcoin',
+            'market_cap_rank' => 1,
+            'is_active' => true,
+        ]);
 
-        foreach ([
-            ['id' => 1, 'name' => 'Bitcoin', 'symbol' => 'BTC'],
-            ['id' => 2, 'name' => 'Ethereum', 'symbol' => 'ETH'],
-        ] as $asset) {
-            $assetsBySymbol[$asset['symbol']] = MarketAsset::query()->create([
-                'provider' => 'coinmarketcap',
-                'provider_asset_id' => $asset['id'],
-                'name' => $asset['name'],
-                'symbol' => $asset['symbol'],
-                'slug' => strtolower($asset['name']),
-                'market_cap_rank' => $asset['id'],
-                'is_active' => true,
+        $ethereum = MarketAsset::query()->create([
+            'provider' => 'coinmarketcap',
+            'provider_asset_id' => 2,
+            'name' => 'Ethereum',
+            'symbol' => 'ETH',
+            'slug' => 'ethereum',
+            'market_cap_rank' => 2,
+            'is_active' => true,
+        ]);
+
+        foreach ([$bitcoin, $ethereum] as $asset) {
+            \Illuminate\Support\Facades\DB::table('market_asset_quotes')->insert([
+                'market_asset_id' => $asset->id,
+                'quote_currency' => 'USDT',
+                'price' => '1',
+                'provider' => 'old-provider',
+                'fetched_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         }
 
         Http::fake([
-            '*api/v3/exchangeInfo*' => Http::response([
-                'symbols' => [[
-                    'symbol' => 'BTCUSDT',
-                    'status' => 'TRADING',
-                    'baseAsset' => 'BTC',
-                    'quoteAsset' => 'USDT',
-                    'isSpotTradingAllowed' => true,
-                ]],
-            ]),
-            '*api/v3/ticker/24hr*' => Http::response([[
-                'symbol' => 'BTCUSDT',
-                'lastPrice' => '65000',
-                'quoteVolume' => '25000000000',
-                'priceChangePercent' => '2.5',
-                'closeTime' => 1795514400000,
-            ]]),
             '*market/stats*' => Http::response([
                 'status' => 'ok',
-                'stats' => ['usdt-rls' => ['latest' => '950000']],
+                'stats' => [
+                    'btc-rls' => [
+                        'latest' => '61750000000',
+                        'dayOpen' => '60000000000',
+                        'dayChange' => '2.9',
+                        'volumeDst' => '1000000',
+                    ],
+                    'usdt-rls' => [
+                        'latest' => '950000',
+                        'dayOpen' => '940000',
+                        'dayChange' => '1.06',
+                    ],
+                ],
             ]),
         ]);
 
         $this->artisan('market:sync-prices --limit=250')
-            ->expectsOutputToContain('Successfully synchronized 1 Binance Spot asset prices.')
+            ->expectsOutputToContain('Successfully synchronized 1 Nobitex asset prices.')
             ->expectsOutputToContain('Skipped 1 assets')
             ->assertExitCode(0);
 
         $this->assertDatabaseCount('market_asset_quotes', 1);
         $this->assertDatabaseHas('market_asset_quotes', [
-            'market_asset_id' => $assetsBySymbol['BTC']->id,
-            'provider' => 'binance',
+            'market_asset_id' => $bitcoin->id,
+            'provider' => 'nobitex',
         ]);
         $this->assertDatabaseMissing('market_asset_quotes', [
-            'market_asset_id' => $assetsBySymbol['ETH']->id,
+            'market_asset_id' => $ethereum->id,
             'quote_currency' => 'USDT',
         ]);
     }
 
-    public function test_dry_run_fetches_binance_prices_without_persisting_them(): void
+    public function test_dry_run_fetches_nobitex_prices_without_persisting_them(): void
     {
         MarketAsset::query()->create([
             'provider' => 'coinmarketcap',
@@ -141,25 +169,21 @@ final class MarketPriceSyncCommandTest extends TestCase
         ]);
 
         Http::fake([
-            '*api/v3/exchangeInfo*' => Http::response([
-                'symbols' => [[
-                    'symbol' => 'BTCUSDT',
-                    'status' => 'TRADING',
-                    'baseAsset' => 'BTC',
-                    'quoteAsset' => 'USDT',
-                    'isSpotTradingAllowed' => true,
-                ]],
-            ]),
-            '*api/v3/ticker/24hr*' => Http::response([[
-                'symbol' => 'BTCUSDT',
-                'lastPrice' => '65000',
-                'quoteVolume' => '25000000000',
-                'priceChangePercent' => '2.5',
-                'closeTime' => 1795514400000,
-            ]]),
             '*market/stats*' => Http::response([
                 'status' => 'ok',
-                'stats' => ['usdt-rls' => ['latest' => '950000']],
+                'stats' => [
+                    'btc-rls' => [
+                        'latest' => '61750000000',
+                        'dayOpen' => '60000000000',
+                        'dayChange' => '2.9',
+                        'volumeDst' => '1000000',
+                    ],
+                    'usdt-rls' => [
+                        'latest' => '950000',
+                        'dayOpen' => '940000',
+                        'dayChange' => '1.06',
+                    ],
+                ],
             ]),
         ]);
 
