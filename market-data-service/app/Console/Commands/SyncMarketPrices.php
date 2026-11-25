@@ -15,7 +15,7 @@ final class SyncMarketPrices extends Command
                             {--limit=250 : Maximum number of ranked active assets to update (1-5000)}
                             {--dry-run : Fetch and validate prices without writing to the database}';
 
-    protected $description = 'Synchronize current USDT prices and the USDT/Toman market rate.';
+    protected $description = 'Synchronize Binance Spot USDT prices and the USDT/Toman market rate.';
 
     public function handle(MarketPriceSyncService $syncService): int
     {
@@ -23,7 +23,6 @@ final class SyncMarketPrices extends Command
 
         if ($limit === false || $limit < 1 || $limit > 5000) {
             $this->components->error('The --limit option must be between 1 and 5000.');
-
             return self::INVALID;
         }
 
@@ -34,11 +33,10 @@ final class SyncMarketPrices extends Command
                 ->whereNotNull('market_cap_rank')
                 ->orderBy('market_cap_rank')
                 ->limit($limit)
-                ->get(['id', 'provider_asset_id']);
+                ->get(['id', 'symbol']);
 
             if ($assets->isEmpty()) {
                 $this->components->error('No active ranked assets were found. Run market:sync-assets first.');
-
                 return self::FAILURE;
             }
 
@@ -46,12 +44,12 @@ final class SyncMarketPrices extends Command
             $mode = $this->option('dry-run') ? 'validated (database unchanged)' : 'synchronized';
 
             $this->components->info(
-                "Successfully {$mode} {$result['count']} asset prices. 1 USDT = {$result['usdt_toman_rate']} Toman.",
+                "Successfully {$mode} {$result['count']} Binance Spot asset prices. 1 USDT = {$result['usdt_toman_rate']} Toman.",
             );
 
             if ($result['skipped_count'] > 0) {
                 $this->components->warn(
-                    "Skipped {$result['skipped_count']} assets because CoinMarketCap returned no valid USDT quote for them.",
+                    "Skipped {$result['skipped_count']} assets because Binance has no unambiguous active USDT Spot market for them.",
                 );
             }
 
@@ -59,7 +57,6 @@ final class SyncMarketPrices extends Command
         } catch (Throwable $exception) {
             report($exception);
             $this->components->error($exception->getMessage());
-
             return self::FAILURE;
         }
     }

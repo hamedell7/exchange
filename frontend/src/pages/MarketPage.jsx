@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, ArrowUpLeft, BarChart3, ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../api/client.js';
+import { useMarketPriceStream } from '../hooks/useMarketPriceStream.js';
 
 const number = new Intl.NumberFormat('fa-IR');
 const usdtNumber = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 8 });
@@ -38,6 +39,31 @@ export default function MarketPage() {
   const [marketData, setMarketData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const handleLivePrices = useCallback((message) => {
+    const updates = new Map(
+      message.prices.map((price) => [String(price.asset_id), price]),
+    );
+
+    setAssets((current) => current.map((asset) => {
+      const update = updates.get(String(asset.id));
+      if (!update) return asset;
+
+      return {
+        ...asset,
+        price_usdt: update.price_usdt,
+        price_toman: update.price_toman,
+        percent_change_24h: update.percent_change_24h,
+        price_updated_at: update.price_updated_at,
+      };
+    }));
+
+    if (message.market_data) {
+      setMarketData((current) => ({ ...current, ...message.market_data }));
+    }
+  }, []);
+
+  const { status: streamStatus } = useMarketPriceStream(handleLivePrices);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -104,14 +130,14 @@ export default function MarketPage() {
             <h1>دنیای دارایی‌های دیجیتال،<br/><span>شفاف و یکپارچه</span></h1>
             <p>قیمت دارایی‌های دیجیتال را با نرخ USDT و تومان، همراه با تغییرات ۲۴ ساعته بررسی کن.</p>
             <div className="market-hero-actions"><a href="#markets" className="market-hero-primary">مشاهده بازارها <ArrowLeft size={17}/></a><Link to="/register" className="market-hero-secondary">شروع فعالیت</Link></div>
-            <div className="market-hero-trust"><ShieldCheck size={16}/> قیمت‌ها از منابع بازار دریافت و به‌صورت دوره‌ای تازه‌سازی می‌شوند</div>
+            <div className="market-hero-trust"><ShieldCheck size={16}/> قیمت‌ها از بازار اسپات دریافت و با اتصال زنده به‌روزرسانی می‌شوند</div>
           </div>
           <div className="market-hero-art" aria-hidden="true"><div className="market-art-ring ring-a"/><div className="market-art-ring ring-b"/><div className="market-art-core"><BarChart3 size={54}/></div><span className="market-art-orbit orbit-bitcoin">₿</span><span className="market-art-orbit orbit-ethereum">◆</span><span className="market-art-orbit orbit-usdt">₮</span></div>
         </section>
 
         <section id="markets" className="market-list-section">
           <div className="market-section-heading"><div><span className="market-section-kicker">MARKET OVERVIEW</span><h2>بازار دارایی‌ها</h2><p>قیمت دارایی‌ها و تغییرات بازار در یک نگاه</p></div><div className="market-count"><span className="market-count-dot"/>{number.format(total)} دارایی</div></div>
-          <div className="market-toolbar"><label className="market-search"><Search size={18}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="جست‌وجوی نام یا نماد دارایی..." aria-label="جست‌وجوی دارایی"/></label><span className="market-source-note">قیمت: CoinMarketCap · نرخ تتر: Nobitex{rateUpdatedAt ? ' · آخرین نرخ: ' + rateUpdatedAt : ''}</span></div>
+          <div className="market-toolbar"><label className="market-search"><Search size={18}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="جست‌وجوی نام یا نماد دارایی..." aria-label="جست‌وجوی دارایی"/></label><span className="market-source-note">قیمت زنده: Binance Spot · نرخ تتر: Nobitex{rateUpdatedAt ? ' · آخرین نرخ: ' + rateUpdatedAt : ''}{streamStatus === 'connected' ? ' · اتصال زنده برقرار' : streamStatus === 'disabled' ? ' · اتصال زنده پیکربندی نشده' : ' · در حال اتصال'}</span></div>
 
           <div className="market-table-meta">
             <div className="market-table-meta-title"><span className="market-table-meta-icon"><BarChart3 size={16}/></span><div><strong>فهرست قیمت‌ها</strong><small>مرتب‌شده بر اساس رتبه بازار</small></div></div>
@@ -159,7 +185,7 @@ export default function MarketPage() {
               <button aria-label="صفحه بعد" title="صفحه بعد" disabled={loading || currentPage >= lastPage} onClick={() => setPage((value) => value + 1)}><ChevronLeft size={18}/></button>
             </div>
           </div>
-          <p className="market-disclaimer">قیمت USDT از CoinMarketCap و نرخ تبدیل USDT به تومان از بازار نوبیتکس دریافت می‌شود. اطلاعات قیمت به‌صورت دوره‌ای به‌روزرسانی می‌شود و ممکن است با قیمت قابل معامله در صرافی‌های دیگر تفاوت داشته باشد.</p>
+          <p className="market-disclaimer">قیمت USDT از بازار اسپات Binance و نرخ تبدیل USDT به تومان از بازار نوبیتکس دریافت می‌شود. استریم تغییرات قیمت به‌صورت لحظه‌ای ارسال می‌شود؛ این قیمت مرجع Binance است و ممکن است با صرافی‌های دیگر تفاوت داشته باشد.</p>
         </section>
 
         <section id="about" className="market-cta"><div><span>EXCHANGE ACCOUNT</span><h2>برای امکانات بعدی آماده‌ای؟</h2><p>حساب کاربری بساز تا با تکمیل سرویس‌ها، امکانات اکسچنج در دسترس تو قرار بگیرد.</p></div><Link to="/register">ایجاد حساب کاربری <ArrowUpLeft size={17}/></Link></section>

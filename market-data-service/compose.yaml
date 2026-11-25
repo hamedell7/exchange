@@ -22,11 +22,21 @@ services:
       CACHE_STORE: database
       SESSION_DRIVER: database
       QUEUE_CONNECTION: database
+      BROADCAST_CONNECTION: reverb
+      REVERB_HOST: app
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+      REVERB_APP_ID: ${REVERB_APP_ID:-}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-}
       CMC_API_KEY: ${CMC_API_KEY:-}
       CMC_BASE_URL: ${CMC_BASE_URL:-https://pro-api.coinmarketcap.com}
       CMC_HTTP_TIMEOUT: ${CMC_HTTP_TIMEOUT:-30}
       CMC_WS_URL: ${CMC_WS_URL:-wss://pro-stream.coinmarketcap.com/v1}
       CMC_WS_PING_INTERVAL_MS: ${CMC_WS_PING_INTERVAL_MS:-10000}
+      BINANCE_SPOT_BASE_URL: ${BINANCE_SPOT_BASE_URL:-https://data-api.binance.vision}
+      BINANCE_SPOT_WS_URL: ${BINANCE_SPOT_WS_URL:-wss://data-stream.binance.vision:443/ws/!ticker_1d@arr}
+      BINANCE_HTTP_TIMEOUT: ${BINANCE_HTTP_TIMEOUT:-20}
       NOBITEX_BASE_URL: ${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
       NOBITEX_HTTP_TIMEOUT: ${NOBITEX_HTTP_TIMEOUT:-15}
     volumes:
@@ -66,11 +76,65 @@ services:
       CACHE_STORE: database
       SESSION_DRIVER: database
       QUEUE_CONNECTION: database
+      BROADCAST_CONNECTION: reverb
+      REVERB_HOST: app
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+      REVERB_APP_ID: ${REVERB_APP_ID:-}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-}
       CMC_API_KEY: ${CMC_API_KEY:-}
       CMC_BASE_URL: ${CMC_BASE_URL:-https://pro-api.coinmarketcap.com}
       CMC_HTTP_TIMEOUT: ${CMC_HTTP_TIMEOUT:-30}
       CMC_WS_URL: ${CMC_WS_URL:-wss://pro-stream.coinmarketcap.com/v1}
       CMC_WS_PING_INTERVAL_MS: ${CMC_WS_PING_INTERVAL_MS:-10000}
+      BINANCE_SPOT_BASE_URL: ${BINANCE_SPOT_BASE_URL:-https://data-api.binance.vision}
+      BINANCE_SPOT_WS_URL: ${BINANCE_SPOT_WS_URL:-wss://data-stream.binance.vision:443/ws/!ticker_1d@arr}
+      BINANCE_HTTP_TIMEOUT: ${BINANCE_HTTP_TIMEOUT:-20}
+      NOBITEX_BASE_URL: ${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
+      NOBITEX_HTTP_TIMEOUT: ${NOBITEX_HTTP_TIMEOUT:-15}
+    volumes:
+      - type: bind
+        source: .
+        target: /var/www/html
+      - type: volume
+        source: market_data_vendor
+        target: /var/www/html/vendor
+    networks:
+      - exchange-network
+
+  streamer:
+    image: exchange-market-data:local
+    container_name: market-data-streamer
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: ["php", "artisan", "market:stream-binance", "--limit=250"]
+    depends_on:
+      - app
+    environment:
+      APP_NAME: market-data
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-market_data_db}
+      DB_USERNAME: ${DB_USERNAME:-market_data_app}
+      DB_PASSWORD: ${DB_PASSWORD:-local_market_data_dev}
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: database
+      BROADCAST_CONNECTION: reverb
+      REVERB_HOST: app
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+      REVERB_APP_ID: ${REVERB_APP_ID:-}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-}
+      BINANCE_SPOT_BASE_URL: ${BINANCE_SPOT_BASE_URL:-https://data-api.binance.vision}
+      BINANCE_SPOT_WS_URL: ${BINANCE_SPOT_WS_URL:-wss://data-stream.binance.vision:443/ws/!ticker_1d@arr}
+      BINANCE_HTTP_TIMEOUT: ${BINANCE_HTTP_TIMEOUT:-20}
       NOBITEX_BASE_URL: ${NOBITEX_BASE_URL:-https://apiv2.nobitex.ir}
       NOBITEX_HTTP_TIMEOUT: ${NOBITEX_HTTP_TIMEOUT:-15}
     volumes:

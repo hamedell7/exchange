@@ -21,6 +21,11 @@ return [
         'websocket_url' => env('CMC_WS_URL', 'wss://pro-stream.coinmarketcap.com/v1'),
         'websocket_ping_interval_ms' => (int) env('CMC_WS_PING_INTERVAL_MS', 10_000),
     ],
+    'binance' => [
+        'spot_base_url' => env('BINANCE_SPOT_BASE_URL', 'https://data-api.binance.vision'),
+        'websocket_url' => env('BINANCE_SPOT_WS_URL', 'wss://data-stream.binance.vision:443/ws/!ticker_1d@arr'),
+        'timeout' => (int) env('BINANCE_HTTP_TIMEOUT', 20),
+    ],
     'nobitex' => [
         'base_url' => env('NOBITEX_BASE_URL', 'https://apiv2.nobitex.ir'),
         'timeout' => (int) env('NOBITEX_HTTP_TIMEOUT', 15),

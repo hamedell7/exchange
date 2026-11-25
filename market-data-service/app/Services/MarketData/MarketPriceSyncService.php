@@ -5,19 +5,20 @@ declare(strict_types=1);
 namespace App\Services\MarketData;
 
 use App\Models\MarketAsset;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class MarketPriceSyncService
 {
     public function __construct(
-        private readonly CoinMarketCapClient $coinMarketCap,
+        private readonly BinanceSpotClient $binance,
         private readonly NobitexClient $nobitex,
     ) {}
 
     /**
-     * Fetch and persist available USDT quotes and the USDT/Toman conversion rate.
+     * Persist Binance Spot USDT quotes and the USDT/Toman conversion rate.
+     * Duplicate symbols and assets without a Binance USDT Spot market are
+     * skipped, and any old quote for those selected assets is removed.
      *
      * @param array<int, MarketAsset> $assets
      * @return array{count: int, skipped_count: int, usdt_toman_rate: string}
@@ -28,74 +29,90 @@ final class MarketPriceSyncService
             throw new RuntimeException('There are no active ranked assets to synchronize.');
         }
 
-        $providerIds = array_map(
-            static fn (MarketAsset $asset): int => (int) $asset->provider_asset_id,
-            $assets,
-        );
-
-        $quotesByProviderId = [];
-
-        foreach (array_chunk($providerIds, 250) as $batch) {
-            foreach ($this->coinMarketCap->latestUsdtQuotes($batch) as $providerId => $quote) {
-                $quotesByProviderId[(int) $providerId] = $quote;
-            }
-        }
-
-        $now = now();
-        $rows = [];
-        $skippedCount = 0;
+        $assetsBySymbol = [];
+        $symbolCounts = [];
 
         foreach ($assets as $asset) {
-            $providerId = (int) $asset->provider_asset_id;
-            $providerQuote = $quotesByProviderId[$providerId]['quote']['USDT'] ?? null;
-            $price = is_array($providerQuote)
-                ? $this->decimal($providerQuote['price'] ?? null, 24)
-                : null;
+            $symbol = strtoupper(trim((string) $asset->symbol));
 
-            // CMC can omit assets with no current quote. Keep syncing the rest.
-            if ($price === null || (float) $price <= 0) {
-                $skippedCount++;
+            if ($symbol === '') {
                 continue;
             }
 
-            $sourceUpdatedAt = isset($providerQuote['last_updated'])
-                ? CarbonImmutable::parse((string) $providerQuote['last_updated'])
-                : null;
+            $symbolCounts[$symbol] = ($symbolCounts[$symbol] ?? 0) + 1;
+            $assetsBySymbol[$symbol] = $asset;
+        }
+
+        $uniqueSymbols = array_keys(array_filter(
+            $symbolCounts,
+            static fn (int $count): bool => $count === 1,
+        ));
+
+        $quotesBySymbol = $this->binance->latestUsdtQuotes($uniqueSymbols);
+        $now = now();
+        $rows = [];
+
+        foreach ($uniqueSymbols as $symbol) {
+            $asset = $assetsBySymbol[$symbol] ?? null;
+            $quote = $quotesBySymbol[$symbol] ?? null;
+
+            if (! $asset instanceof MarketAsset || ! is_array($quote)) {
+                continue;
+            }
+
+            $price = $this->decimal($quote['price'] ?? null, 24);
+
+            if ($price === null || bccomp($price, '0', 24) <= 0) {
+                continue;
+            }
 
             $rows[] = [
                 'market_asset_id' => $asset->id,
                 'quote_currency' => 'USDT',
                 'price' => $price,
-                'market_cap' => $this->decimal($providerQuote['market_cap'] ?? null, 8),
-                'volume_24h' => $this->decimal($providerQuote['volume_24h'] ?? null, 8),
-                'percent_change_1h' => $this->decimal($providerQuote['percent_change_1h'] ?? null, 8),
-                'percent_change_24h' => $this->decimal($providerQuote['percent_change_24h'] ?? null, 8),
-                'percent_change_7d' => $this->decimal($providerQuote['percent_change_7d'] ?? null, 8),
-                'provider' => 'coinmarketcap',
-                'source_updated_at' => $sourceUpdatedAt,
+                'market_cap' => null,
+                'volume_24h' => $this->decimal($quote['volume_24h'] ?? null, 8),
+                'percent_change_1h' => null,
+                'percent_change_24h' => $this->decimal($quote['percent_change_24h'] ?? null, 8),
+                'percent_change_7d' => null,
+                'provider' => 'binance',
+                'source_updated_at' => $quote['source_updated_at'] ?? $now,
                 'fetched_at' => $now,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
         }
 
-        if ($rows === []) {
-            throw new RuntimeException('CoinMarketCap did not return any valid USDT prices for the requested assets.');
-        }
-
         $exchangeRate = $this->nobitex->latestUsdtTomanRate();
+        $selectedAssetIds = array_values(array_unique(array_map(
+            static fn (MarketAsset $asset): int => (int) $asset->id,
+            $assets,
+        )));
+        $pricedAssetIds = array_column($rows, 'market_asset_id');
+        $unpricedAssetIds = array_values(array_diff($selectedAssetIds, $pricedAssetIds));
 
         if (! $dryRun) {
-            DB::transaction(function () use ($rows, $exchangeRate, $now): void {
-                DB::table('market_asset_quotes')->upsert(
-                    $rows,
-                    ['market_asset_id', 'quote_currency'],
-                    [
-                        'price', 'market_cap', 'volume_24h',
-                        'percent_change_1h', 'percent_change_24h', 'percent_change_7d',
-                        'provider', 'source_updated_at', 'fetched_at', 'updated_at',
-                    ],
-                );
+            DB::transaction(function () use ($rows, $unpricedAssetIds, $exchangeRate, $now): void {
+                if ($rows !== []) {
+                    DB::table('market_asset_quotes')->upsert(
+                        $rows,
+                        ['market_asset_id', 'quote_currency'],
+                        [
+                            'price', 'market_cap', 'volume_24h',
+                            'percent_change_1h', 'percent_change_24h', 'percent_change_7d',
+                            'provider', 'source_updated_at', 'fetched_at', 'updated_at',
+                        ],
+                    );
+                }
+
+                // Remove old CMC/other-provider quotes when Binance has no
+                // valid USDT market for an asset in this selected batch.
+                if ($unpricedAssetIds !== []) {
+                    DB::table('market_asset_quotes')
+                        ->where('quote_currency', 'USDT')
+                        ->whereIn('market_asset_id', $unpricedAssetIds)
+                        ->delete();
+                }
 
                 DB::table('market_exchange_rates')->upsert(
                     [[
@@ -116,19 +133,17 @@ final class MarketPriceSyncService
 
         return [
             'count' => count($rows),
-            'skipped_count' => $skippedCount,
+            'skipped_count' => count($assets) - count($rows),
             'usdt_toman_rate' => $exchangeRate['rate'],
         ];
     }
 
     private function decimal(mixed $value, int $scale): ?string
     {
-        if (! is_numeric($value)) {
+        if (! is_scalar($value) || ! is_numeric($value)) {
             return null;
         }
 
-        $formatted = number_format((float) $value, $scale, '.', '');
-
-        return rtrim(rtrim($formatted, '0'), '.') ?: '0';
+        return bcadd(trim((string) $value), '0', $scale);
     }
 }
