@@ -36,6 +36,8 @@ services:
         target: /var/www/html/vendor
     ports:
       - "127.0.0.1:8003:8000"
+      # Local-only Reverb test endpoint; Reverb listens on 8080 inside this container.
+      - "127.0.0.1:8082:8080"
     networks:
       - exchange-network
 
