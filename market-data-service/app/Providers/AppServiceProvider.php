@@ -4,6 +4,10 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -19,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Auth::viaRequest(
+            'pulse-guest',
+            static fn (Request $request) => null
+        );
     }
 }
