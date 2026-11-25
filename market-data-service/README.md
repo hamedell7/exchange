@@ -60,9 +60,7 @@ Run migrations:
 
     docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml exec app php artisan migrate --force
 
-For a fresh database, import the asset catalog before starting the streamer. The Reverb server runs inside the app container. Start it in a separate terminal (or use \`exec -d\`):
-
-    docker compose --env-file market-data-service/.env -f market-data-service/compose.yaml exec -d app php artisan reverb:start --host=0.0.0.0 --port=8080
+For a fresh database, import the asset catalog before starting the streamer. Reverb is started automatically by its dedicated Compose service; no detached process needs to be started inside the API container.
 
 After the database and catalog are ready, start the scheduler and streamer:
 
