@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Services\MarketData\CoinMarketCapStreamProtocol;
+use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -40,6 +41,34 @@ final class CoinMarketCapStreamProtocolTest extends TestCase
         self::assertSame(1, $message['data']['cid']);
         self::assertSame(65000.25, $message['data']['p']);
         self::assertSame(1778663880111, $message['ts']);
+    }
+
+
+    public function test_it_accepts_a_valid_websocket_upgrade_handshake(): void
+    {
+        $key = base64_encode(random_bytes(16));
+        $accept = base64_encode(sha1(
+            $key.'258EAFA5-E914-47DA-95CA-C5AB0DC85B11',
+            true,
+        ));
+        $response = new Response(101, [
+            'Upgrade' => 'websocket',
+            'Connection' => 'keep-alive, Upgrade',
+            'Sec-WebSocket-Accept' => $accept,
+        ]);
+
+        self::assertTrue(CoinMarketCapStreamProtocol::isValidHandshakeResponse($response, $key));
+    }
+
+    public function test_it_rejects_an_invalid_websocket_upgrade_handshake(): void
+    {
+        $response = new Response(200, [
+            'Upgrade' => 'websocket',
+            'Connection' => 'Upgrade',
+            'Sec-WebSocket-Accept' => 'invalid',
+        ]);
+
+        self::assertFalse(CoinMarketCapStreamProtocol::isValidHandshakeResponse($response, 'test-key'));
     }
 
     public function test_it_builds_a_protocol_ping(): void

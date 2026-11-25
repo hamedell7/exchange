@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\MarketData;
 
 use JsonException;
+use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 
 final class CoinMarketCapStreamProtocol
@@ -32,6 +33,28 @@ final class CoinMarketCapStreamProtocol
             'channel' => self::PRICE_CHANNEL,
             'params' => ['crypto_ids' => $ids],
         ];
+    }
+
+
+    public static function isValidHandshakeResponse(ResponseInterface $response, string $webSocketKey): bool
+    {
+        if ($response->getStatusCode() !== 101) {
+            return false;
+        }
+
+        $upgrade = strtolower(trim($response->getHeaderLine('Upgrade')));
+        $connectionTokens = array_map(
+            static fn (string $token): string => strtolower(trim($token)),
+            explode(',', $response->getHeaderLine('Connection')),
+        );
+        $expectedAccept = base64_encode(sha1(
+            $webSocketKey.'258EAFA5-E914-47DA-95CA-C5AB0DC85B11',
+            true,
+        ));
+
+        return $upgrade === 'websocket'
+            && in_array('upgrade', $connectionTokens, true)
+            && hash_equals($expectedAccept, trim($response->getHeaderLine('Sec-WebSocket-Accept')));
     }
 
     /**

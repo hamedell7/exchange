@@ -7,7 +7,6 @@ namespace App\Services\MarketData;
 use GuzzleHttp\Psr7\HttpFactory;
 use GuzzleHttp\Psr7\Message as Psr7Message;
 use GuzzleHttp\Psr7\Uri;
-use Ratchet\RFC6455\Handshake\ClientNegotiator;
 use Ratchet\RFC6455\Messaging\CloseFrameChecker;
 use Ratchet\RFC6455\Messaging\Frame;
 use Ratchet\RFC6455\Messaging\FrameInterface;
@@ -132,7 +131,12 @@ final class CoinMarketCapWebSocketClient
 
         $this->connector->connect($socketUri)->then(
             function (ConnectionInterface $stream) use ($parts, $host, $port): void {
-                $this->beginHandshake($stream, $parts, $host, $port);
+                try {
+                    $this->beginHandshake($stream, $parts, $host, $port);
+                } catch (Throwable $exception) {
+                    $stream->close();
+                    $this->scheduleReconnect($exception);
+                }
             },
             function (Throwable $exception): void {
                 $this->scheduleReconnect($exception);
@@ -154,9 +158,16 @@ final class CoinMarketCapWebSocketClient
         $authority = $host.($port === 443 ? '' : ':'.$port);
         $uri = new Uri('https://'.$authority.$path.$query);
 
-        $negotiator = new ClientNegotiator(new HttpFactory());
-        $request = $negotiator->generateRequest($uri)
+        // Keep all header values strings. The current Ratchet negotiator
+        // passes integer 13 to Guzzle PSR-7, which rejects non-string values.
+        $webSocketKey = base64_encode(random_bytes(16));
+        $request = (new HttpFactory())->createRequest('GET', $uri)
             ->withHeader('Host', $authority)
+            ->withHeader('User-Agent', 'Exchange-MarketData/1.0')
+            ->withHeader('Connection', 'Upgrade')
+            ->withHeader('Upgrade', 'websocket')
+            ->withHeader('Sec-WebSocket-Version', '13')
+            ->withHeader('Sec-WebSocket-Key', $webSocketKey)
             ->withHeader('X-CMC_PRO_API_KEY', $this->apiKey);
 
         $handshakeBuffer = '';
@@ -172,7 +183,7 @@ final class CoinMarketCapWebSocketClient
             &$handshakeBuffer,
             $stream,
             $request,
-            $negotiator,
+            $webSocketKey,
         ): void {
             if ($this->handshakeComplete) {
                 $this->feedWebSocketFrames($chunk);
@@ -201,7 +212,7 @@ final class CoinMarketCapWebSocketClient
             try {
                 $response = Psr7Message::parseResponse($rawHeaders);
 
-                if ($response->getStatusCode() !== 101 || ! $negotiator->validateResponse($request, $response)) {
+                if (! CoinMarketCapStreamProtocol::isValidHandshakeResponse($response, $webSocketKey)) {
                     throw new RuntimeException(
                         'CMC rejected the WebSocket handshake with HTTP '.$response->getStatusCode().'. Check the API key and WebSocket plan.',
                     );
