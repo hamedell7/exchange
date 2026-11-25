@@ -383,20 +383,19 @@ final class CoinMarketCapWebSocketClient
         }
 
         if ($type === 'error') {
-            $status = is_array($message['status'] ?? null) ? $message['status'] : [];
-            $code = (string) ($status['error_code'] ?? 'unknown');
-            $detail = (string) ($status['error_message'] ?? $status['error_detail'] ?? 'CMC returned an error.');
-            $this->notifyStatus('error', "CMC error {$code}: {$detail}");
+            $error = CoinMarketCapStreamProtocol::describeError($message);
+            $this->notifyStatus('error', "CMC error {$error['code']}: {$error['message']}");
 
-            // Authentication, plan, protocol, and subscription errors will not
-            // be fixed by reconnecting. Stop rather than repeatedly retrying.
-            if (in_array($code, ['1001', '1002', '1003', '1004', '1006', '1007', '1010', '2201', '2202', '2204', '2301', '2302', '2303', '2304', '2401', '2402'], true)) {
-                $this->stop(true);
+            // A rejected request will not become valid by reconnecting.
+            // Retry only provider-side internal errors; stop for all other
+            // errors to avoid a tight reconnect loop and unnecessary credits.
+            if ($error['code'] === '5001') {
+                $stream->close();
 
                 return;
             }
 
-            $stream->close();
+            $this->stop(true);
 
             return;
         }

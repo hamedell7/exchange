@@ -71,6 +71,34 @@ final class CoinMarketCapStreamProtocolTest extends TestCase
         self::assertFalse(CoinMarketCapStreamProtocol::isValidHandshakeResponse($response, 'test-key'));
     }
 
+
+    public function test_it_extracts_coinmarketcap_rest_style_error_details(): void
+    {
+        self::assertSame([
+            'code' => '2401',
+            'message' => "Missing required param for channel. | Param 'crypto_ids' is required.",
+        ], CoinMarketCapStreamProtocol::describeError([
+            'type' => 'error',
+            'id' => 1,
+            'status' => [
+                'error_code' => '2401',
+                'error_message' => 'Missing required param for channel.',
+                'error_detail' => "Param 'crypto_ids' is required.",
+            ],
+        ]));
+    }
+
+    public function test_it_preserves_unknown_error_payloads_for_diagnostics(): void
+    {
+        self::assertSame([
+            'code' => 'unknown',
+            'message' => '{"type":"error","reason":"unexpected frame"}',
+        ], CoinMarketCapStreamProtocol::describeError([
+            'type' => 'error',
+            'reason' => 'unexpected frame',
+        ]));
+    }
+
     public function test_it_builds_a_protocol_ping(): void
     {
         self::assertSame([

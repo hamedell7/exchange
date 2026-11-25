@@ -57,6 +57,53 @@ final class CoinMarketCapStreamProtocol
             && hash_equals($expectedAccept, trim($response->getHeaderLine('Sec-WebSocket-Accept')));
     }
 
+
+    /**
+     * @param array<string, mixed> $message
+     * @return array{code: string, message: string}
+     */
+    public static function describeError(array $message): array
+    {
+        $status = is_array($message['status'] ?? null) ? $message['status'] : [];
+        $nestedMessage = is_array($message['msg'] ?? null) ? $message['msg'] : [];
+
+        $code = $status['error_code']
+            ?? $message['error_code']
+            ?? $message['code']
+            ?? $nestedMessage['code']
+            ?? 'unknown';
+
+        $summary = $status['error_message']
+            ?? $message['error_message']
+            ?? $message['message']
+            ?? $nestedMessage['msg']
+            ?? (is_string($message['msg'] ?? null) ? $message['msg'] : null);
+
+        $detail = $status['error_detail']
+            ?? $message['error_detail']
+            ?? $message['detail']
+            ?? null;
+
+        $parts = [];
+
+        if (is_scalar($summary) && (string) $summary !== '') {
+            $parts[] = (string) $summary;
+        }
+
+        if (is_scalar($detail) && (string) $detail !== '' && (string) $detail !== (string) $summary) {
+            $parts[] = (string) $detail;
+        }
+
+        if ($parts === []) {
+            $parts[] = json_encode($message, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: 'CMC returned an empty error payload.';
+        }
+
+        return [
+            'code' => (string) $code,
+            'message' => implode(' | ', $parts),
+        ];
+    }
+
     /**
      * @return array<string, int|string>
      */
